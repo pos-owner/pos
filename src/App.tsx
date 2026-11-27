@@ -114,7 +114,7 @@ function OutboxSentToast() {
   return null;
 }
 
-function FullError({ message, retry, title }: { message: string; retry: () => void; title?: string }) {
+function FullError({ message, retry, title, showOfflineHint = true }: { message: string; retry: () => void; title?: string; showOfflineHint?: boolean }) {
   const offline = !navigator.onLine;
   const t = useT();
   return (
@@ -122,7 +122,7 @@ function FullError({ message, retry, title }: { message: string; retry: () => vo
       <div className="empty">
         <div className="em-ic">{offline ? <I.wifiOff /> : <I.alert />}</div>
         <h3>{t(offline ? "You're offline" : (title ?? "pOS couldn't start"))}</h3>
-        <p>{t(offline ? "Connect to the internet to see the latest rent, payments and requests." : message)}</p>
+        <p>{t(offline && showOfflineHint ? "Connect to the internet to see the latest rent, payments and requests." : message)}</p>
         <button className="btn md auto" onClick={retry}>
           {t("Try again")}
         </button>
@@ -289,6 +289,8 @@ function Gate() {
   const { status, me, error, recovery, refresh } = useAuth();
   const { pathname } = useLocation();
   if (status === "loading") return <Splash />;
+  if (status === "signOutPending")
+    return <FullError message="Sign-out is pending. Connect and try again to finish signing out." retry={refresh} showOfflineHint={false} />;
   if (status === "error") return <FullError message={error} retry={refresh} />;
   if (recovery)
     return (

@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { useApi } from "../../lib/api";
+import { api, ApiError } from "../../lib/api";
+import { extractCode, RECEIPT_CODE } from "../../lib/receiptCode";
 import { useAuth } from "../../lib/auth";
 import { dateLabel, monthLabel, rupees } from "../../lib/format";
 import type { VerifyResponse } from "../../lib/types";
@@ -15,16 +16,6 @@ import "../../styles/verify.css";
  */
 
 const METHOD: Record<string, string> = { upi: "UPI", cash: "Cash", bank: "Bank transfer" };
-const CODE = /^[0-9a-z]{1,10}-[\w-]{12}$/;
-
-/** Pulls a receipt code out of whatever was pasted: the code itself or the whole /verify/… link. */
-export function extractCode(input: string): string {
-  const s = input.trim();
-  const fromLink = /\/verify\/([^/?#\s]+)/.exec(s);
-  const code = decodeURIComponent(fromLink ? fromLink[1] : s).trim();
-  return code;
-}
-
 function checkedLabel(iso?: string) {
   const d = iso ? new Date(iso) : new Date();
   return new Intl.DateTimeFormat("en-IN", {
@@ -41,19 +32,9 @@ export default function VerifyReceipt() {
   const { code = "" } = useParams();
   const { status } = useAuth();
   const signedIn = status === "ready";
-  const { data, error, loading, reload } = useApi<VerifyResponse>(
-    code ? `/api/verify/${encodeURIComponent(code)}` : null,
-  );
-
   useEffect(() => {
     document.title = "Verify a rent receipt · pOS";
   }, []);
-
-  let body;
-  if (!code) body = <EnterCode />;
-  else if (loading) body = <Checking />;
-  else if (error && error.status !== 404) body = <Problem message={error.message} rateLimited={error.status === 429} retry={reload} />;
-  else body = <Result code={code} data={error ? { valid: false } : (data ?? { valid: false })} />;
 
   return (
     <div className="verify-page">
@@ -73,7 +54,7 @@ export default function VerifyReceipt() {
         </Link>
       </header>
       <main id="verify-main" className="verify-main" tabIndex={-1}>
-        {body}
+        {code ? <Verification key={code} code={code} /> : <EnterCode />}
         <HowItWorks />
       </main>
       <footer className="verify-foot">
@@ -85,6 +66,33 @@ export default function VerifyReceipt() {
       </footer>
     </div>
   );
+}
+
+/** A verdict must describe this visit's check, since an owner may have voided a previously valid receipt. */
+function Verification({ code }: { code: string }) {
+  const [attempt, retry] = useState(0);
+  const [result, setResult] = useState<VerifyResponse | ApiError | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    api<VerifyResponse>(`/api/verify/${encodeURIComponent(code)}`).then(
+      (value) => { if (active) setResult(value); },
+      (error: unknown) => {
+        if (active) setResult(error instanceof ApiError ? error : new ApiError("Couldn't check this receipt.", 0));
+      },
+    );
+    return () => { active = false; };
+  }, [code, attempt]);
+
+  if (!result) return <Checking />;
+  if (result instanceof ApiError) {
+    if (result.status === 404) return <Result code={code} data={{ valid: false }} />;
+    return <Problem message={result.message} rateLimited={result.status === 429} retry={() => {
+      setResult(null);
+      retry((n) => n + 1);
+    }} />;
+  }
+  return <Result code={code} data={result} />;
 }
 
 function Checking() {
@@ -306,7 +314,7 @@ function EnterCode() {
   const submit = (e: FormEvent) => {
     e.preventDefault();
     const code = extractCode(value);
-    if (!CODE.test(code)) {
+    if (!RECEIPT_CODE.test(code)) {
       setErr("That doesn't look like a receipt code. It is printed under the QR code, like “1a-Xy3…”, or paste the whole link.");
       return;
     }

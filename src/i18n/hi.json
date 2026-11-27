@@ -1,4 +1,8 @@
 {
+  "Sign-out is pending. Connect and try again to finish signing out.": "साइन आउट बाकी है। इंटरनेट से जुड़ें और फिर कोशिश करें।",
+  "Enter a valid usual rent.": "सही सामान्य किराया दर्ज करें।",
+  "Enter a valid monthly rent.": "सही मासिक किराया दर्ज करें।",
+  "Enter a valid deposit.": "सही जमा राशि दर्ज करें।",
   "Home": "होम",
   "Rent": "किराया",
   "Tenants": "किरायेदार",

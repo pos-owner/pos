@@ -1347,6 +1347,9 @@ a.row:active,
 }
 
 /* Bottom sheet */
+body:has(.sheet-root) {
+  overflow: hidden;
+}
 .sheet-root {
   position: fixed;
   inset: 0;

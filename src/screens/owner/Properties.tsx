@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api, ApiError, invalidate, useApi } from "../../lib/api";
-import { rupees } from "../../lib/format";
+import { parseRentAmount, rupees } from "../../lib/format";
 import type { WorkspaceProperty, WorkspaceResponse, WorkspaceUnit } from "../../lib/types";
 import {
   Avatar,
@@ -292,7 +292,9 @@ function UnitForm({
 
   async function save() {
     if (!label.trim()) return s.setErr("Give the unit a name, like A-101.");
-    const body = { label: label.trim(), type, baseRent: Number(rent.replace(/[,\s]/g, "")) || 0 };
+    const baseRent = parseRentAmount(rent);
+    if (baseRent === null) return s.setErr("Enter a valid usual rent.");
+    const body = { label: label.trim(), type, baseRent };
     const ok = await s.run(
       "save",
       () =>

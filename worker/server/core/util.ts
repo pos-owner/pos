@@ -171,7 +171,9 @@ export function cleanInt(v: unknown, min = 0, max = 100_000_000): number | null 
   return r < min || r > max ? null : r;
 }
 export function cleanDate(v: unknown): string | null {
-  return typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v)) ? v : null;
+  if (typeof v !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return null;
+  const date = new Date(v);
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === v ? v : null;
 }
 export function oneOf<T extends string>(v: unknown, opts: readonly T[]): T | null {
   return typeof v === "string" && (opts as readonly string[]).includes(v) ? (v as T) : null;

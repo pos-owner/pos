@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api, ApiError, invalidate, useApi } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
-import { dateLabel, daysFromToday, monthLabel, ordinal, phoneLabel, rupees, todayISO } from "../../lib/format";
+import { dateLabel, daysFromToday, monthLabel, ordinal, parseRentAmount, phoneLabel, rupees, todayISO } from "../../lib/format";
 import { reminderText, telLink, whatsappLink } from "../../lib/links";
 import type { TenantDetailResponse } from "../../lib/types";
 import {
@@ -472,15 +472,18 @@ function TenancyForm({ tn, onClose, tenantName }: { tn: Tn; onClose: () => void;
 
   async function save() {
     const d = Number(dueDay);
-    if (!Number(rent)) return setErr("Enter the monthly rent.");
-    if (!d || d < 1 || d > 28) return setErr("The due day must be between 1 and 28.");
+    const monthlyRent = parseRentAmount(rent, 1);
+    const depositAmount = parseRentAmount(deposit);
+    if (monthlyRent === null) return setErr("Enter a valid monthly rent.");
+    if (depositAmount === null) return setErr("Enter a valid deposit.");
+    if (!Number.isInteger(d) || d < 1 || d > 28) return setErr("The due day must be between 1 and 28.");
     if (endDate && endDate < tn.startDate) return setErr("The end date must be after the start date.");
     setBusy("save");
     setErr("");
     try {
       await api(`/api/tenancies/${tn.id}`, {
         method: "PATCH",
-        body: { rent: Number(rent), dueDay: d, deposit: Number(deposit) || 0, endDate: endDate || null },
+        body: { rent: monthlyRent, dueDay: d, deposit: depositAmount, endDate: endDate || null },
       });
       refreshRent();
       toast("Tenancy updated");

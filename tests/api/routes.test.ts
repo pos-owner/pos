@@ -94,6 +94,35 @@ test("another workspace can't read this workspace's charges", async () => {
   assert.equal((await other.get(`/api/charges/${any.id}`)).status, 404);
 });
 
+test("invalid unit and tenancy amounts cannot silently save defaults or partial edits", async () => {
+  const [unit] = await app.sql<{ property_id: number }>("SELECT property_id FROM units WHERE id = ?", unitIds[0]);
+  const base = { propertyId: unit.property_id, label: "Invalid amount" };
+  for (const baseRent of ["12oops", -1, 100_000_001]) {
+    assert.equal((await owner.post("/api/units", { ...base, baseRent })).status, 400);
+    assert.equal((await owner.patch(`/api/units/${unitIds[0]}`, { baseRent, label: "Changed" })).status, 400);
+  }
+  assert.deepEqual(await app.sql("SELECT label, base_rent FROM units WHERE id = ?", unitIds[0]), [
+    { label: "G-1", base_rent: 10000 },
+  ]);
+  assert.equal((await owner.post("/api/units", { ...base, label: "Optional rent" })).body.baseRent, 0);
+  assert.equal((await owner.post("/api/tenants", {
+    fullName: "Invalid deposit", unitId: unitIds[1], startDate: today, rent: 9000, deposit: "typo",
+  })).status, 400);
+  assert.equal((await owner.patch(`/api/tenancies/${tenancyId}`, { rent: "typo", deposit: 4000 })).status, 400);
+  assert.equal((await owner.patch(`/api/tenancies/${tenancyId}`, { rent: 9000, deposit: -100 })).status, 400);
+  assert.deepEqual(await app.sql("SELECT rent, deposit FROM tenancies WHERE id = ?", tenancyId), [
+    { rent: 10000, deposit: 0 },
+  ]);
+});
+
+test("a nonexistent date is rejected while a leap day is accepted", async () => {
+  const path = `/api/tenancies/${tenancyId}`;
+  assert.equal((await owner.patch(path, { endDate: "2099-02-29" })).status, 400);
+  assert.equal((await owner.patch(path, { endDate: "2104-02-29" })).status, 200);
+  assert.equal((await tenancyOf(tenantId)).endDate, "2104-02-29");
+  assert.equal((await owner.patch(path, { endDate: null })).status, 200);
+});
+
 test("a malformed end date is rejected instead of clearing the lease end", async () => {
   assert.equal((await owner.patch(`/api/tenancies/${tenancyId}`, { endDate: "soon" })).status, 400);
   assert.equal((await owner.patch(`/api/tenancies/${tenancyId}`, { endDate: "2000-01-01" })).status, 400);

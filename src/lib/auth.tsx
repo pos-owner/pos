@@ -20,7 +20,7 @@ export interface Me {
   } | null;
   ownerName?: string;
 }
-type Status = "loading" | "signedOut" | "setup" | "ready" | "error";
+type Status = "loading" | "signedOut" | "setup" | "ready" | "error" | "signOutPending";
 interface AuthState {
   status: Status;
   me: Me | null;
@@ -35,6 +35,9 @@ interface AuthState {
   signedIn: () => Promise<void>;
 }
 
+// The cookie is HttpOnly: a local sign-out must be completed by the server on reconnect.
+const SIGN_OUT_KEY = "pos.auth.signout-pending";
+
 const Ctx = createContext<AuthState>(null!);
 export const useAuth = () => useContext(Ctx);
 
@@ -46,7 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * Reset links always take the normal path.
    */
   const [boot] = useState(() => {
-    if (hasAuthParams(window.location.hash, window.location.search)) return null;
+    if (browserStore.getItem(SIGN_OUT_KEY) || hasAuthParams(window.location.hash, window.location.search)) return null;
     const remembered = readMe<Me>(browserStore);
     if (!remembered?.profile) return null;
     restoreSnapshot(remembered.user.id);
@@ -66,9 +69,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setMe(m);
   }, []);
 
+  const pending = useRef(browserStore.getItem(SIGN_OUT_KEY) === "1");
+  const signOutRequest = useRef<Promise<void> | null>(null);
+  const sessionEpoch = useRef(0);
+
+  const finishSignOut = useCallback(() => {
+    if (signOutRequest.current) return signOutRequest.current;
+    signOutRequest.current = (async () => {
+      try {
+        await import("./push").then((m) => m.disablePush()).catch(() => undefined);
+        const result = await api<{ ok: boolean }>("/api/auth/signout", { method: "POST" });
+        if (result?.ok !== true) throw new Error("Sign-out was not confirmed.");
+        browserStore.removeItem(SIGN_OUT_KEY);
+        pending.current = false;
+        setStatus("signedOut");
+      } catch {
+        setStatus("signOutPending");
+      } finally {
+        signOutRequest.current = null;
+      }
+    })();
+    return signOutRequest.current;
+  }, []);
+
   const refresh = useCallback(async () => {
+    if (pending.current) return finishSignOut();
+    const epoch = sessionEpoch.current;
     try {
       const m = await api<Me>("/api/me");
+      if (epoch !== sessionEpoch.current) return;
       if (meRef.current && meRef.current.user.id !== m.user.id) {
         // What was remembered belongs to someone else: drop it and load this person properly.
         clearCache();
@@ -83,6 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       put(m);
       setStatus(m.profile ? "ready" : "setup");
     } catch (e) {
+      if (epoch !== sessionEpoch.current) return;
       if (e instanceof ApiError && e.status === 401) {
         // Wipe the cache only if someone's data was on screen, so a signed-out screen that is loading its own
         // public data (an invite, say) isn't disturbed.
@@ -97,12 +127,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Otherwise we're offline or the server hiccuped: keep showing what the last session left; the next
       // request retries and the offline bar already says what's going on.
     }
-  }, [put]);
+  }, [finishSignOut, put]);
 
   useEffect(() => {
     if (resetToken) clearResetFromUrl();
     refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    const online = () => {
+      if (pending.current) void finishSignOut();
+    };
+    window.addEventListener("online", online);
+    return () => window.removeEventListener("online", online);
+  }, [finishSignOut]);
 
   /*
    * The offline outbox (outbox.ts) follows whoever is signed in: their saved entries load and start sending as soon
@@ -124,19 +162,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [put, refresh]);
 
   const signOut = useCallback(async () => {
-    try {
-      // Stop pushes to this browser first (it needs the session): the next person here shouldn't get them.
-      await import("./push").then((m) => m.disablePush()).catch(() => undefined);
-      await api("/api/auth/signout", { method: "POST" });
-    } catch {
-      /* the cookie may already be gone; signing out locally is what matters */
-    } finally {
-      stopOutbox();
-      clearCache();
-      put(null);
-      setStatus("signedOut");
-    }
-  }, [put]);
+    sessionEpoch.current++;
+    pending.current = true;
+    browserStore.setItem(SIGN_OUT_KEY, "1");
+    stopOutbox();
+    clearCache();
+    put(null);
+    setStatus("loading");
+    await finishSignOut();
+  }, [finishSignOut, put]);
 
   const value = useMemo(
     () => ({ status, me, error, notice, recovery, refresh, signOut, signedIn, clearRecovery: () => setRecovery("") }),
