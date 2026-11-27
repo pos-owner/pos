@@ -489,6 +489,20 @@ img {
   width: 22px;
   height: 22px;
 }
+@media (max-width: 380px) {
+  .navbar .nav-left,
+  .navbar .nav-right {
+    gap: 4px;
+  }
+  .navbar .circle-btn {
+    width: 40px;
+    height: 40px;
+  }
+  .navbar .circle-btn svg {
+    width: 20px;
+    height: 20px;
+  }
+}
 .pill-btn {
   height: 44px;
   padding: 0 16px;
@@ -1127,25 +1141,25 @@ a.row:active,
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: 1fr;
-  padding: 2px;
+  padding: 3px;
   border-radius: 999px;
   background: var(--fill-3);
-  height: 36px;
+  height: 44px;
   isolation: isolate;
 }
 .seg::before {
   content: "";
   position: absolute;
   z-index: -1;
-  top: 2px;
-  bottom: 2px;
-  left: 2px;
-  width: calc((100% - 4px) / var(--n));
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc((100% - 6px) / var(--n));
   border-radius: 999px;
   background: var(--bg-elevated);
   box-shadow:
-    0 3px 8px rgba(0, 0, 0, 0.1),
-    0 0 0 0.5px rgba(0, 0, 0, 0.04);
+    0 4px 10px rgba(0, 0, 0, 0.12),
+    0 0 0 0.5px rgba(0, 0, 0, 0.06);
   transform: translateX(calc(100% * var(--i)));
   transition: transform 0.38s var(--spring);
 }
@@ -1159,7 +1173,7 @@ a.row:active,
   background: #5a5a5f;
 }
 .seg button {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--label);
   border-radius: 999px;
