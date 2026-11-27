@@ -1,0 +1,19 @@
+// Companion Worker for the Cloudflare Pages deployment only: calls POST /api/cron/daily once a day.
+// The Workers deployment (root wrangler.jsonc) has its own Cron Trigger and does not need this.
+//
+//   npm run cron:deploy
+//   npx wrangler secret put CRON_SECRET -c cloudflare/cron-worker/wrangler.jsonc   (same value as the Pages project)
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "pos-daily-cron",
+  "main": "index.js",
+  "compatibility_date": "2026-11-01",
+  "workers_dev": false,
+  "observability": { "enabled": true },
+  // 00:30 UTC is 06:00 IST.
+  "triggers": { "crons": ["30 0 * * *"] },
+  "vars": {
+    // Your Pages address, without a trailing slash.
+    "APP_URL": "https://pos.pages.dev"
+  }
+}
