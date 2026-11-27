@@ -1,6 +1,15 @@
 const inr = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 });
 export const rupees = (n: number | undefined | null) => `₹${inr.format(n ?? 0)}`;
 
+/** Parse a rent or deposit field without silently turning mistyped amounts into zero. */
+export function parseRentAmount(input: string, minimum = 0): number | null {
+  const text = input.replace(/[,\s]/g, "");
+  if (!text && !input.trim() && minimum === 0) return 0;
+  if (!/^\d+(?:\.\d+)?$/.test(text)) return null;
+  const rounded = Math.round(Number(text));
+  return rounded >= minimum && rounded <= 100_000_000 ? rounded : null;
+}
+
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const MONTHS_LONG = [
   "January",

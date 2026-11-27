@@ -263,6 +263,20 @@ test("voiding a multi-month payment voids every month and keeps the receipt, mar
   const w = await workspace();
   const r = await w.owner.post(`/api/tenancies/${w.tenancyId}/payments`, { amount: 25000, method: "cash" });
   assert.equal(r.status, 200);
+  const paymentId = r.body.paymentIds[0];
+  const original = await w.owner.get(`/api/payments/${paymentId}/receipt.json`);
+  assert.equal(original.status, 200);
+  const path = `/api${new URL(original.body.verifyUrl).pathname}`;
+  const valid = await app.call(null, "GET", path);
+  assert.equal(valid.status, 200);
+  assert.match(valid.headers.get("cache-control") ?? "", /no-store/);
+  assert.equal(valid.body.voided, false);
+  assert.equal(valid.body.voidedOn, null);
+  assert.equal(valid.body.amount, 25000);
+  assert.equal(valid.body.method, "cash");
+  assert.equal(valid.body.months, 3);
+  assert.equal(valid.body.issuedOn, original.body.issuedOn);
+  assert.ok(Number.isFinite(Date.parse(valid.body.checkedAt)));
   assert.equal((await w.owner.post(`/api/payments/${r.body.paymentIds[1]}/void`, { reason: "" })).status, 400);
   const v = await w.owner.post(`/api/payments/${r.body.paymentIds[1]}/void`, { reason: "Entered twice" });
   assert.equal(v.status, 200);
@@ -276,6 +290,10 @@ test("voiding a multi-month payment voids every month and keeps the receipt, mar
   const model = await w.owner.get(`/api/payments/${r.body.paymentIds[0]}/receipt.json`);
   assert.equal(model.status, 200);
   assert.equal(model.body.voided, true);
+  const checkedAgain = await app.call(null, "GET", path);
+  assert.equal(checkedAgain.status, 200);
+  assert.equal(checkedAgain.body.voided, true);
+  assert.ok(checkedAgain.body.voidedOn);
   // Void rows can't be deleted or voided again.
   assert.equal((await w.owner.del(`/api/payments/${r.body.paymentIds[0]}`)).status, 409);
   assert.equal((await w.owner.post(`/api/payments/${r.body.paymentIds[0]}/void`, { reason: "x" })).status, 409);

@@ -311,7 +311,7 @@ export default function OwnerHome() {
             </div>
             <div className="mt8">
               <span className="amount">{rupees(data.collected)}</span>
-              <span className="of">of {rupees(data.due)}</span>
+              {" "}<span className="of">of {rupees(data.due)}</span>
             </div>
             <div className="meter">
               <span style={{ "--p": pct } as CSSProperties} />

@@ -498,13 +498,15 @@ api.post("/units", roles("owner"), async (c) => {
   if (!p) return c.json({ error: "Choose a property." }, 400);
   const label = cleanStr(b.label, 40);
   if (!label) return c.json({ error: "Give the unit a name, like A-101." }, 400);
+  const baseRent = b.baseRent === undefined ? 0 : cleanInt(b.baseRent);
+  if (baseRent === null) return c.json({ error: "Enter a valid usual rent." }, 400);
   const [u] = await db
     .insert(units)
     .values({
       propertyId: p.id,
       label,
       type: cleanStr(b.type, 20) || "1BHK",
-      baseRent: cleanInt(b.baseRent) ?? 0,
+      baseRent,
     })
     .returning();
   return c.json(u);
@@ -515,12 +517,14 @@ api.patch("/units/:id", roles("owner"), async (c) => {
   const row = await ownedUnit(a, Number(c.req.param("id")));
   if (!row) return c.json({ error: "Unit not found." }, 404);
   const b = await body(c);
+  const baseRent = b.baseRent === undefined ? row.u.baseRent : cleanInt(b.baseRent);
+  if (baseRent === null) return c.json({ error: "Enter a valid usual rent." }, 400);
   await db
     .update(units)
     .set({
       label: cleanStr(b.label, 40) || row.u.label,
       type: cleanStr(b.type, 20) || row.u.type,
-      baseRent: cleanInt(b.baseRent) ?? row.u.baseRent,
+      baseRent,
     })
     .where(eq(units.id, row.u.id));
   return c.json({ ok: true });
@@ -678,7 +682,8 @@ api.post("/tenants", roles("owner"), async (c) => {
     .from(tenancies)
     .where(and(eq(tenancies.unitId, row.u.id), eq(tenancies.status, "active")));
   if (busy) return c.json({ error: `${row.u.label} already has an active tenant. End that tenancy first.` }, 409);
-  const deposit = cleanInt(b.deposit) ?? 0;
+  const deposit = b.deposit === undefined ? 0 : cleanInt(b.deposit);
+  if (deposit === null) return c.json({ error: "Enter a valid deposit." }, 400);
   // A failed tenancy insert must not leave a tenant record with no unit behind (D1 has no interactive
   // transactions, so the tenant is removed again if the second insert fails).
   const t = await (async () => {
@@ -761,12 +766,16 @@ api.patch("/tenancies/:id", roles("owner"), async (c) => {
   if (endDate && endDate < tn.startDate) return c.json({ error: "The end date must be after the start date." }, 400);
   if (b.dueDay !== undefined && cleanInt(b.dueDay, 1, 28) === null)
     return c.json({ error: "The due day must be between 1 and 28." }, 400);
+  const rent = b.rent === undefined ? tn.rent : cleanInt(b.rent, 1);
+  if (rent === null) return c.json({ error: "Enter a valid monthly rent." }, 400);
+  const deposit = b.deposit === undefined ? tn.deposit : cleanInt(b.deposit);
+  if (deposit === null) return c.json({ error: "Enter a valid deposit." }, 400);
   const [after] = await db
     .update(tenancies)
     .set({
-      rent: cleanInt(b.rent, 1) ?? tn.rent,
+      rent,
       dueDay: cleanInt(b.dueDay, 1, 28) ?? tn.dueDay,
-      deposit: cleanInt(b.deposit) ?? tn.deposit,
+      deposit,
       endDate,
     })
     .where(eq(tenancies.id, tn.id))

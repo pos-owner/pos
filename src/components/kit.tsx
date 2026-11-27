@@ -3,6 +3,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type ReactNode,
@@ -457,14 +458,18 @@ export function Sheet({
   doneDisabled?: boolean;
   busy?: boolean;
 }) {
-  const [mounted, setMounted] = useState(open);
+  const [mounted, setMounted] = useState(false);
   const [closing, setClosing] = useState(false);
   const sheet = useRef<HTMLDivElement>(null);
+  const opener = useRef<HTMLElement | null>(null);
+  const closeRef = useRef(onClose);
+  useLayoutEffect(() => { closeRef.current = onClose; }, [onClose]);
   const drag = useRef<{ y: number; t: number; dy: number } | null>(null);
   const tl = useT();
 
   useEffect(() => {
     if (open) {
+      if (!mounted && document.activeElement instanceof HTMLElement) opener.current = document.activeElement;
       setMounted(true);
       setClosing(false);
     } else if (mounted) {
@@ -477,17 +482,39 @@ export function Sheet({
     }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    if (!mounted) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+  useLayoutEffect(() => {
+    const panel = sheet.current;
+    if (!mounted || !panel) return;
+    const previous = opener.current;
+    if (!panel.contains(document.activeElement)) panel.focus();
+    const onKey = (e: KeyboardEvent) => {
+      const roots = document.querySelectorAll(".sheet-root");
+      if (roots[roots.length - 1] !== panel.parentElement || e.defaultPrevented) return;
+      if (e.key === "Escape") {
+        e.preventDefault();
+        closeRef.current();
+      } else if (e.key === "Tab") {
+        const items = [...panel.querySelectorAll<HTMLElement>(
+          "button, a[href], input, select, textarea, [tabindex]",
+        )].filter((item) => item.tabIndex >= 0 && !item.matches(":disabled") &&
+          !item.closest("[inert]") && item.getClientRects().length > 0 &&
+          getComputedStyle(item).visibility === "visible");
+        const first = items[0];
+        const last = items.at(-1);
+        const active = document.activeElement;
+        if (!first || !panel.contains(active) || active === panel || active === (e.shiftKey ? first : last)) {
+          e.preventDefault();
+          ((e.shiftKey ? last : first) ?? panel).focus();
+        }
+      }
+    };
     window.addEventListener("keydown", onKey);
     return () => {
-      document.body.style.overflow = prev;
       window.removeEventListener("keydown", onKey);
+      const active = document.activeElement;
+      if ((active === document.body || panel.contains(active)) && previous?.isConnected) previous.focus();
     };
-  }, [mounted, onClose]);
+  }, [mounted]);
 
   if (!mounted) return null;
 
@@ -521,7 +548,7 @@ export function Sheet({
   return createPortal(
     <div className={`sheet-root ${closing ? "closing" : ""}`} role="dialog" aria-modal="true" aria-label={tl(title)}>
       <div className="scrim" onClick={onClose} />
-      <div ref={sheet} className={`sheet ${closing ? "closing" : ""}`}>
+      <div ref={sheet} tabIndex={-1} className={`sheet ${closing ? "closing" : ""}`}>
         <div
           className="sheet-head"
           onPointerDown={onDown}

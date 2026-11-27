@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api, ApiError, useApi } from "../../lib/api";
-import { rupees, todayISO } from "../../lib/format";
+import { parseRentAmount, rupees, todayISO } from "../../lib/format";
 import type { TenantListItem, WorkspaceResponse } from "../../lib/types";
 import {
   Avatar,
@@ -209,12 +209,14 @@ export function AddTenantSheet({
   }
 
   async function save() {
-    const rent = Number(f.rent.replace(/[,\s]/g, ""));
+    const rent = parseRentAmount(f.rent, 1);
+    const deposit = parseRentAmount(f.deposit);
     if (!f.fullName.trim()) return setErr("Enter the tenant's name.");
     if (!unit) return setErr("Choose a vacant unit.");
-    if (!rent) return setErr("Enter the monthly rent.");
+    if (rent === null) return setErr("Enter a valid monthly rent.");
+    if (deposit === null) return setErr("Enter a valid deposit.");
     const due = Number(f.dueDay);
-    if (!due || due < 1 || due > 28) return setErr("The due day must be between 1 and 28.");
+    if (!Number.isInteger(due) || due < 1 || due > 28) return setErr("The due day must be between 1 and 28.");
     if (f.phone && f.phone.replace(/\D/g, "").length < 10)
       return setErr("Enter a 10-digit mobile number, or leave it blank.");
     setBusy(true);
@@ -226,7 +228,7 @@ export function AddTenantSheet({
           unitId: unit,
           rent,
           dueDay: due,
-          deposit: Number(f.deposit.replace(/[,\s]/g, "")) || 0,
+          deposit,
           endDate: f.endDate || null,
         },
       });
