@@ -1,4 +1,4 @@
-// Runs the Worker locally (`wrangler dev`) with local D1 and R2: http://localhost:8787
+// Runs the Worker locally (`wrangler dev`) with a local D1: http://localhost:8787
 //
 //   npm run dev:api            no Cloudflare login needed
 //   npm run dev:api -- --ai    keep the Workers AI binding (meter-photo reading); needs `npm run cf:login`

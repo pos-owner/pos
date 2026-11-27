@@ -35,7 +35,7 @@ import {
 } from "./domain/data.ts";
 import { seedWorkspace } from "./domain/seed.ts";
 import { body, ownedPhotoKeys, savePhoto, secret, signKeys, validPhotoKey } from "./core/http.ts";
-import { getPhoto } from "./core/storage.ts";
+import { getPhoto, MAX_PHOTO_BYTES } from "./core/storage.ts";
 import { cronDaily, registerToolRoutes } from "./toolRoutes.ts";
 import { registerAccountRoutes, registerAuthRoutes } from "./authRoutes.ts";
 import { registerPaymentRoutes } from "./paymentRoutes.ts";
@@ -374,7 +374,8 @@ api.post("/photos", roles("owner", "staff", "tenant"), async (c) => {
   const form = await c.req.formData().catch(() => null);
   const file = form?.get("file");
   if (!(file instanceof File)) return c.json({ error: "Choose a photo to upload." }, 400);
-  if (file.size > 6 * 1024 * 1024) return c.json({ error: "That photo is too large (max 6 MB)." }, 413);
+  if (file.size > MAX_PHOTO_BYTES)
+    return c.json({ error: "That photo is too large (max 1.2 MB). Try a smaller photo or lower camera quality." }, 413);
   const bytes = await file.arrayBuffer();
   const actual = detectImageMime(bytes);
   const declared =

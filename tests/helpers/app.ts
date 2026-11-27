@@ -1,13 +1,13 @@
 /**
- * Route-test harness: runs the real Hono API (`worker/server/routes.ts`) in Node against Miniflare's local D1 and R2
- * (the same SQLite engine and bucket emulation `wrangler dev` uses), with every migration in `migrations/` applied.
+ * Route-test harness: runs the real Hono API (`worker/server/routes.ts`) in Node against Miniflare's local D1
+ * (the same SQLite engine `wrangler dev` uses), with every migration in `migrations/` applied.
  * Each test file gets its own Miniflare instance, so its database starts empty. Nothing leaves the machine.
  * Not named *.test.ts, so `npm test` only runs it through the route tests.
  */
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { convertV4MiniflareOptions, Miniflare } from "miniflare";
-import type { D1Database, R2Bucket } from "@cloudflare/workers-types";
+import type { D1Database } from "@cloudflare/workers-types";
 import { setBindings } from "../../worker/server/core/bindings.ts";
 import { sha256 } from "../../worker/server/core/password.ts";
 
@@ -56,14 +56,12 @@ export async function startApp() {
       script: "export default { fetch() { return new Response(null, { status: 404 }); } }",
       compatibilityDate: "2026-11-01",
       d1Databases: { DB: "pos-test" },
-      r2Buckets: ["PHOTOS"],
     }),
   );
   const d1 = (await mf.getD1Database("DB")) as unknown as D1Database;
-  const photos = (await mf.getR2Bucket("PHOTOS")) as unknown as R2Bucket;
   await d1.prepare("PRAGMA foreign_keys = ON").run();
   await applyMigrations(d1);
-  setBindings({ DB: d1, PHOTOS: photos, CRON_SECRET: "test-cron-secret", SIGNING_SECRET: "test-signing-secret" });
+  setBindings({ DB: d1, CRON_SECRET: "test-cron-secret", SIGNING_SECRET: "test-signing-secret" });
 
   const { default: api } = await import("../../worker/server/routes.ts");
 
@@ -155,6 +153,6 @@ export async function startApp() {
     return decodeURIComponent(m[1]);
   }
 
-  return { api, d1, photos, sql, run, call, signIn, sessionToken, close };
+  return { api, d1, sql, run, call, signIn, sessionToken, close };
 }
 export type TestApp = Awaited<ReturnType<typeof startApp>>;

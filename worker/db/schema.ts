@@ -511,7 +511,7 @@ export const automations = sqliteTable(
   (t) => [uniqueIndex("automations_owner_name_uq").on(t.ownerId, t.name)],
 );
 
-/** Who uploaded each photo in the private R2 bucket. Keys are random, so ownership is checked here. */
+/** Who uploaded each photo. Keys are random, so ownership is checked here. The image itself is in `photo_data`. */
 export const photoUploads = sqliteTable(
   "photo_uploads",
   {
@@ -524,6 +524,18 @@ export const photoUploads = sqliteTable(
   },
   (t) => [index("photo_uploads_owner_idx").on(t.ownerId)],
 );
+
+/**
+ * The photo bytes themselves, stored in D1 (no R2 bucket needed). `data` is base64 text: D1 returns text cheaply,
+ * whereas BLOB columns come back as arrays of numbers. A D1 row can hold 2 MB, so uploads are capped well below that
+ * (MAX_PHOTO_BYTES in worker/server/core/storage.ts).
+ */
+export const photoData = sqliteTable("photo_data", {
+  key: text().primaryKey(),
+  data: text().notNull(),
+  size: integer().notNull(),
+  createdAt: createdAt(),
+});
 
 /** Short-lived counters for database-backed abuse limits (D1 is strongly consistent, unlike KV). */
 export const rateLimits = sqliteTable(

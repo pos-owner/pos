@@ -1,0 +1,15 @@
+# Netlify builds the static PWA only (the API runs on Cloudflare). Vite and its plugins are devDependencies,
+# so install them explicitly even when NODE_ENV=production.
+[build]
+  command = "npm install --include=dev --no-audit --no-fund && npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "24"
+  NPM_CONFIG_PRODUCTION = "false"
+
+# Single-page app: unknown paths (e.g. /verify/<code>) load index.html.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

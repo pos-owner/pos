@@ -9,6 +9,7 @@ import { features } from "./lib/features";
 import type { Dashboard } from "./lib/types";
 import { SkeletonPage, TabBar, ToastProvider, useToast, type Tab } from "./components/kit";
 import { I } from "./components/icons";
+import { QuickSearch } from "./components/QuickSearch";
 
 /* Screens are split per route so each role only downloads what it uses. */
 const L = (f: () => Promise<{ default: ComponentType }>) => lazy(f);
@@ -213,6 +214,7 @@ function OwnerApp() {
           <Route path="/notifications" element={<Notifications />} />
           <Route path="/outbox" element={<Outbox />} />
           <Route path="/u/:code" element={<ScanUnit />} />
+          <Route path="/verify" element={<VerifyReceipt />} />
           <Route path="/verify/:code" element={<VerifyReceipt />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/join/:token" element={<Join />} />
@@ -220,6 +222,7 @@ function OwnerApp() {
         </Routes>
       </Suspense>
       {show && <TabBar tabs={ownerTabs(data)} />}
+      <QuickSearch />
     </>
   );
 }
@@ -240,6 +243,7 @@ function TenantApp() {
           <Route path="/notifications" element={<Notifications />} />
           <Route path="/outbox" element={<Outbox />} />
           <Route path="/u/:code" element={<ScanUnit />} />
+          <Route path="/verify" element={<VerifyReceipt />} />
           <Route path="/verify/:code" element={<VerifyReceipt />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/join/:token" element={<Join />} />
@@ -247,6 +251,7 @@ function TenantApp() {
         </Routes>
       </Suspense>
       {show && <TabBar tabs={TENANT_TABS} />}
+      <QuickSearch />
     </>
   );
 }
@@ -267,6 +272,7 @@ function StaffApp() {
           <Route path="/notifications" element={<Notifications />} />
           <Route path="/outbox" element={<Outbox />} />
           <Route path="/u/:code" element={<ScanUnit />} />
+          <Route path="/verify" element={<VerifyReceipt />} />
           <Route path="/verify/:code" element={<VerifyReceipt />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/join/:token" element={<Join />} />
@@ -274,6 +280,7 @@ function StaffApp() {
         </Routes>
       </Suspense>
       {show && <TabBar tabs={STAFF_TABS} />}
+      <QuickSearch />
     </>
   );
 }
@@ -300,6 +307,7 @@ function Gate() {
       <Suspense fallback={<Splash />}>
         <Routes>
           <Route path="/join/:token" element={<Join />} />
+          <Route path="/verify" element={<VerifyReceipt />} />
           <Route path="/verify/:code" element={<VerifyReceipt />} />
           <Route path="/u/:code" element={<ScanUnit />} />
           <Route path="*" element={status === "signedOut" ? <Welcome /> : <Onboarding />} />

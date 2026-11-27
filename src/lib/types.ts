@@ -723,10 +723,20 @@ export interface VerifyResponse {
   month?: string;
   monthTo?: string | null;
   voided?: boolean;
+  /** YYYY-MM-DD, when the landlord voided the payment. */
+  voidedOn?: string | null;
+  /** YYYY-MM-DD, when the receipt was issued. */
+  issuedOn?: string;
+  /** "upi" | "cash" | "bank" */
+  method?: string;
+  /** How many months the payment covers (1 for a single month). */
+  months?: number;
   tenant?: string;
   unit?: string;
   property?: string;
   landlord?: string;
+  /** Server time of this check (ISO). */
+  checkedAt?: string;
 }
 
 export type Locale = "en" | "hi";

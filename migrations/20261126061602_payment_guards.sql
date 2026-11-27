@@ -45,3 +45,4 @@ BEGIN
   WHERE (SELECT `tenancy_id` FROM `charges` WHERE `id` = NEW.`charge_id`)
     IS NOT (SELECT `tenancy_id` FROM `payment_batches` WHERE `id` = NEW.`batch_id`);
 END;
+

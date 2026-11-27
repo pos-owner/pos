@@ -1,34 +1,15 @@
-# Workers AI: reading meter photos
+# Workers AI: meter-photo reading
 
-Staff and owners can photograph an electricity or water meter and have the reading filled in. pOS sends the photo to a Workers AI vision model and asks for the number, a confidence and a short note. People always see and can correct the result before it is saved.
+When Workers AI is available, a user can photograph an electricity or water meter and receive a suggested reading. The user must review or correct the value before saving it; AI output is not treated as verified data.
 
-## Turn it on
+## Enable
 
-Workers deployment: already on. `wrangler.jsonc` has
+The Workers deployment declares the `AI` binding in `wrangler.jsonc`. Set `METER_AI=off` to disable the feature without removing the binding. The default model is `@cf/meta/llama-4-scout-17b-16e-instruct`; set `METER_AI_MODEL` to another supported vision model if needed.
 
-```jsonc
-"ai": { "binding": "AI" }
-```
+For Pages, add Workers AI as binding `AI` and redeploy. Without the binding, manual meter entry remains available.
 
-Pages deployment: project → Settings → Bindings → Add → **Workers AI**, variable name `AI`, then redeploy.
+## Local development and usage
 
-Without the binding the app hides scanning and people type readings by hand.
+Workers AI has no local emulator. `npm run dev:api` intentionally removes the AI binding so the rest of the app works without Cloudflare login. To make real AI requests, authenticate and run `npm run dev:api -- --ai`; these requests use the account's Workers AI service.
 
-## Settings
-
-| Variable | Default | Effect |
-| --- | --- | --- |
-| `METER_AI` | on | `off` hides scanning even with the binding (handy to stop usage without a redeploy of bindings) |
-| `METER_AI_MODEL` | `@cf/meta/llama-4-scout-17b-16e-instruct` | Any Workers AI model that accepts images. Browse them in the dashboard under **AI → Workers AI → Models** |
-
-The code is in `worker/server/domain/meters.ts` (`POST /api/meters/scan`). Replies that wrap the JSON in prose or code fences are handled.
-
-## Cost
-
-Workers AI is billed in **Neurons**. The Free plan includes a daily allowance (10,000 Neurons/day at the time of writing), which covers a good number of meter scans; beyond it, usage is billed on Workers Paid. Check the current figures on Cloudflare's Workers AI pricing page, and watch usage under **AI → Workers AI** in the dashboard.
-
-To cap spend, set `METER_AI=off`, or put an **AI Gateway** in front (dashboard → AI → AI Gateway) for rate limits, caching and analytics.
-
-## Local development
-
-Workers AI has no local emulation. With the binding present, `wrangler dev` asks you to log in and sends AI calls to your Cloudflare account (they count toward usage); `METER_AI=off` does not avoid the login. So `npm run dev:api` starts without the binding and meter scanning shows as unavailable. Use `npm run dev:api -- --ai` after `npm run cf:login` to try real scans. Tests never call it.
+Model availability, pricing and included quotas can change. Check Cloudflare's current Workers AI documentation and usage dashboard before enabling the feature for a large audience. Use `METER_AI=off` to stop requests.

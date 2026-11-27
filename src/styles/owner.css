@@ -299,10 +299,14 @@
   --series-2: #c45a00;
 }
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --series-1: #0a84ff;
     --series-2: #d06a00;
   }
+}
+:root[data-theme="dark"] {
+  --series-1: #0a84ff;
+  --series-2: #d06a00;
 }
 
 /* ---------- Payment confirmation: the daily heartbeat ---------- */
@@ -604,9 +608,12 @@
   }
 }
 @media (prefers-color-scheme: dark) {
-  .mini-btn.wa-btn {
+  :root:not([data-theme="light"]) .mini-btn.wa-btn {
     color: #4ade80;
   }
+}
+:root[data-theme="dark"] .mini-btn.wa-btn {
+  color: #4ade80;
 }
 .caught-up {
   display: flex;

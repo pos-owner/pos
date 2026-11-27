@@ -7,7 +7,7 @@
  *               one message per workspace, so each one runs (and retries) on its own; otherwise it runs inline.
  *  - queue      Consumer for DAILY_QUEUE.
  *
- * Bindings: D1 (DB), R2 (PHOTOS), Workers AI (AI), Queues (DAILY_QUEUE), static assets (ASSETS), optional EMAIL.
+ * Bindings: D1 (DB), Workers AI (AI), Queues (DAILY_QUEUE), static assets (ASSETS), optional EMAIL.
  * Deploy: `npm run deploy` (see docs/cloudflare/deploy-workers.md). D1 migrations are applied by Wrangler.
  */
 import type { ExecutionContext, MessageBatch, ScheduledController } from "@cloudflare/workers-types";

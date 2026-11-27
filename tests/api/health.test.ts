@@ -21,7 +21,7 @@ test("health is 200 and says the database answered", async () => {
 });
 
 test("health is 503 when D1 is unreachable, and recovers when it is back", async () => {
-  const bindings = { DB: app.d1, PHOTOS: app.photos, CRON_SECRET: "test-cron-secret", SIGNING_SECRET: "test-signing-secret" };
+  const bindings = { DB: app.d1, CRON_SECRET: "test-cron-secret", SIGNING_SECRET: "test-signing-secret" };
   const broken = {
     prepare() {
       throw new Error("D1 is down");

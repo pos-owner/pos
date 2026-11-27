@@ -1,15 +1,13 @@
-import type { Ai, D1Database, Queue, R2Bucket } from "@cloudflare/workers-types";
+import type { Ai, D1Database, Queue } from "@cloudflare/workers-types";
 
 /**
  * Cloudflare bindings declared in wrangler.jsonc. The Worker entry (worker/index.ts) hands them over with
  * `setBindings(env)` on every request, cron run and queue batch. An isolate always serves one deployment, so
- * every call sees the same bindings object. Tests call `setBindings` with Miniflare's D1 and R2.
+ * every call sees the same bindings object. Tests call `setBindings` with Miniflare's D1.
  */
 export interface Bindings {
-  /** D1: every table (worker/db/schema.ts). */
+  /** D1: every table (worker/db/schema.ts), including photos (maintenance, comments, meter photos). */
   DB: D1Database;
-  /** R2: private photo bucket (maintenance, comments, meter photos) and cached PDF reports. */
-  PHOTOS: R2Bucket;
   /** Workers AI: reads meter photos. Optional; without it people type the reading. */
   AI?: Ai;
   /** Queue: the daily cycle fans out one message per workspace (optional; without it the cron runs inline). */

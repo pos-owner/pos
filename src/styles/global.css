@@ -100,7 +100,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --accent: #0a84ff;
     --accent-press: #3d9bff;
     --accent-tint: rgba(10, 132, 255, 0.2);
@@ -139,6 +139,45 @@
     --scrim: rgba(0, 0, 0, 0.5);
   }
 }
+/* The same, when dark is chosen in Settings → Display. */
+:root[data-theme="dark"] {
+  --accent: #0a84ff;
+  --accent-press: #3d9bff;
+  --accent-tint: rgba(10, 132, 255, 0.2);
+  --bg: #000000;
+  --bg-elevated: #1c1c1e;
+  --bg-sheet: #1c1c1e;
+  --bg-tertiary: #2c2c2e;
+  --label: #f5f5f7;
+  --label-2: rgba(235, 235, 245, 0.62);
+  --label-3: rgba(235, 235, 245, 0.3);
+  --separator: rgba(110, 110, 118, 0.6);
+  --card-edge: inset 0 0 0 0.5px rgba(255, 255, 255, 0.08);
+  --fill: rgba(120, 120, 128, 0.36);
+  --fill-2: rgba(120, 120, 128, 0.3);
+  --fill-3: rgba(118, 118, 128, 0.22);
+  --green: #30d158;
+  --green-text: #4ade80;
+  --green-tint: rgba(48, 209, 88, 0.18);
+  --orange: #ff9f0a;
+  --orange-text: #ffb340;
+  --orange-tint: rgba(255, 159, 10, 0.18);
+  --red: #ff453a;
+  --red-text: #ff6961;
+  --red-tint: rgba(255, 69, 58, 0.18);
+  --purple: #bf5af2;
+  --purple-text: #da8fff;
+  --purple-tint: rgba(191, 90, 242, 0.2);
+  --gray-text: rgba(235, 235, 245, 0.7);
+  --gray-tint: rgba(120, 120, 128, 0.28);
+  --glass-bg: rgba(38, 38, 42, 0.62);
+  --glass-solid: rgba(30, 30, 33, 0.97);
+  --glass-edge: rgba(255, 255, 255, 0.14);
+  --glass-rim: rgba(0, 0, 0, 0.4);
+  --glass-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.4);
+  --card-shadow: var(--card-edge);
+  --scrim: rgba(0, 0, 0, 0.5);
+}
 
 /* Lite mode (auto on low-end devices, or chosen in Settings): no live blur, lighter shadows. */
 :root[data-perf="lite"] {
@@ -147,7 +186,7 @@
   --glass-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
 }
 @media (prefers-reduced-transparency: reduce) {
-  :root {
+  :root[data-perf] {
     --glass-bg: var(--glass-solid);
     --blur: none;
   }
@@ -1111,9 +1150,13 @@ a.row:active,
   transition: transform 0.38s var(--spring);
 }
 @media (prefers-color-scheme: dark) {
-  .seg::before {
+  :root:not([data-theme="light"]) .seg::before {
     background: #5a5a5f;
   }
+}
+/* The same, when dark is chosen in Settings → Display. */
+:root[data-theme="dark"] .seg::before {
+  background: #5a5a5f;
 }
 .seg button {
   font-size: 14px;
@@ -2059,4 +2102,103 @@ html:lang(hi) {
   --font:
     -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter Variable", Inter, "Noto Sans Devanagari",
     "Kohinoor Devanagari", "Nirmala UI", system-ui, sans-serif;
+}
+
+/* ---------- Display & accessibility (Settings → Display; src/lib/display.ts) ---------- */
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+/* Bigger text everywhere. The design uses px, so the whole app scales together and layouts keep their rhythm. */
+:root[data-text="large"] body {
+  zoom: 1.1;
+}
+:root[data-text="larger"] body {
+  zoom: 1.22;
+}
+/* Higher contrast: stronger secondary text and hairlines, underlined links, a thicker focus ring. */
+:root[data-contrast="more"] {
+  --label-2: rgba(30, 30, 36, 0.86);
+  --label-3: rgba(30, 30, 36, 0.6);
+  --separator: rgba(30, 30, 36, 0.42);
+  --glass-bg: var(--glass-solid);
+  --blur: none;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-contrast="more"]:not([data-theme="light"]) {
+    --label-2: rgba(245, 245, 250, 0.88);
+    --label-3: rgba(245, 245, 250, 0.62);
+    --separator: rgba(200, 200, 210, 0.5);
+  }
+}
+:root[data-contrast="more"][data-theme="dark"] {
+  --label-2: rgba(245, 245, 250, 0.88);
+  --label-3: rgba(245, 245, 250, 0.62);
+  --separator: rgba(200, 200, 210, 0.5);
+}
+:root[data-contrast="more"] a:not(.btn):not(.row):not(.tab):not([role="tab"]) {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+:root[data-contrast="more"] :focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+:root[data-contrast="more"] .card,
+:root[data-contrast="more"] .list {
+  box-shadow: inset 0 0 0 1px var(--separator);
+}
+/* Reduce motion chosen in Settings, on top of the phone's own setting. */
+:root[data-motion="reduce"] *,
+:root[data-motion="reduce"] *::before,
+:root[data-motion="reduce"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+@media (forced-colors: active) {
+  .btn,
+  .circle-btn,
+  .chip,
+  .seg button[aria-pressed="true"] {
+    border: 1px solid ButtonText;
+  }
+  :focus-visible {
+    outline: 3px solid Highlight;
+  }
+}
+
+/* "Skip to content" for keyboard and switch users: hidden until focused. */
+.skip-link {
+  position: fixed;
+  top: calc(var(--safe-t) + 8px);
+  left: 50%;
+  z-index: 1000;
+  transform: translate(-50%, -160%);
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+  font-size: 15px;
+  box-shadow: var(--glass-shadow);
+  transition: transform 0.2s var(--ease);
+}
+.skip-link:focus,
+.skip-link:focus-visible {
+  transform: translate(-50%, 0);
+  outline-offset: 3px;
+}
+.display-group {
+  margin: 0 0 12px;
+}
+.display-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--label-2);
+  margin: 0 4px 6px;
 }

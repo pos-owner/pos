@@ -3,7 +3,7 @@
  * the document's data as JSON and the phone draws the PDF, so the Worker stays inside the free plan's CPU limit
  * and doesn't ship pdf-lib at all. Loaded on demand (see src/lib/pdf.ts), so it never slows down app start.
  */
-import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
+import { LineCapStyle, PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 
 const MONTHS = [
   "January",
@@ -56,6 +56,55 @@ export const INK = rgb(0.07, 0.07, 0.09);
 export const MUTED = rgb(0.42, 0.42, 0.47);
 export const ACCENT = rgb(0.04, 0.48, 1);
 export const RULE = rgb(0.86, 0.86, 0.89);
+/** Brand colours, taken from the app icon (public/icons/icon.svg). */
+export const BRAND = rgb(0.294, 0.173, 0.561); // #4b2c8f
+export const BRAND_DEEP = rgb(0.118, 0.141, 0.341); // #1e2457
+export const BRAND_INK = rgb(0.227, 0.165, 0.471); // #3a2a78
+export const CORAL = rgb(1, 0.553, 0.38); // #ff8d61
+export const GREEN = rgb(0.098, 0.533, 0.255);
+export const RED = rgb(0.8, 0.1, 0.12);
+export const ORANGE = rgb(0.75, 0.42, 0.02);
+
+/*
+ * The pOS mark drawn as vectors (no image embedding, so it stays sharp when printed and adds no weight): the same
+ * house, rupee and "paid" coin as the app icon, on the brand's indigo tile.
+ * Paths are in the icon's 512-unit space; pdf-lib flips the y axis for SVG paths.
+ */
+const LOGO = {
+  tile: "M115 0H397A115 115 0 0 1 512 115V397A115 115 0 0 1 397 512H115A115 115 0 0 1 0 397V115A115 115 0 0 1 115 0Z",
+  house:
+    "M256 104c7.6 0 15 2.7 20.9 7.7l118 100.4c9.9 8.4 15.6 20.7 15.6 33.7V372c0 24.3-19.7 44-44 44H145.5c-24.3 0-44-19.7-44-44V245.8c0-13 5.7-25.3 15.6-33.7l118-100.4c5.9-5 13.3-7.7 20.9-7.7z",
+  rupee: "M206 236h100M206 276h100M214 236h22c30 0 48 17 48 40s-18 40-48 40h-22l78 74",
+  check: "M352 146l14 14 26-28",
+};
+
+/** Draws the pOS mark `size` points wide with its top-left corner at (`x`, `top`). */
+export function drawLogo(page: PDFPage, x: number, top: number, size: number) {
+  const scale = size / 512;
+  const at = { x, y: top, scale };
+  page.drawSvgPath(LOGO.tile, { ...at, color: BRAND });
+  page.drawSvgPath(LOGO.house, { ...at, color: rgb(1, 1, 1) });
+  page.drawSvgPath(LOGO.rupee, {
+    ...at,
+    borderColor: BRAND_INK,
+    borderWidth: 24,
+    borderLineCap: LineCapStyle.Round,
+  });
+  page.drawCircle({
+    x: x + 372 * scale,
+    y: top - 146 * scale,
+    size: 46 * scale,
+    color: CORAL,
+    borderColor: rgb(1, 1, 1),
+    borderWidth: 10 * scale,
+  });
+  page.drawSvgPath(LOGO.check, {
+    ...at,
+    borderColor: rgb(1, 1, 1),
+    borderWidth: 12,
+    borderLineCap: LineCapStyle.Round,
+  });
+}
 
 export class Writer {
   page!: PDFPage;
@@ -161,8 +210,7 @@ export class Writer {
   /** Header block. `number` is shown as "No. …" unless `sub` replaces that line. */
   brand(title: string, number: string, date: string, sub?: string) {
     const p = this.page;
-    p.drawRectangle({ x: this.m, y: this.y - 26, width: 26, height: 26, color: ACCENT });
-    p.drawText("p", { x: this.m + 8.2, y: this.y - 19, size: 15, font: this.bold, color: rgb(1, 1, 1) });
+    drawLogo(p, this.m, this.y, 26);
     p.drawText(safe(title), { x: this.m + 36, y: this.y - 12, size: 15, font: this.bold, color: INK });
     p.drawText(safe(sub ?? `No. ${number}`), {
       x: this.m + 36,

@@ -1,123 +1,56 @@
 # D1 database and migrations
 
-pOS keeps every table in one D1 database (binding `DB`, default name `pos`). D1 is SQLite, run by Cloudflare close to the Worker.
+The Workers and Pages deployments use one D1 database through binding `DB`. `worker/db/schema.ts` is the source of truth for tables.
 
-## Where the database lives
+## Migration pipeline
 
-D1 keeps the primary copy in one region, chosen when the database is created and not changeable afterwards. Without a hint Cloudflare picks the region nearest to where the create command runs, which for GitHub Actions is usually the US, so every query from India would cross an ocean. `npm run cf:setup` therefore creates it with `--location apac`. Override with `D1_LOCATION=wnam|enam|weur|eeur|apac|oc npm run cf:setup`. It only applies when the database is first created; an existing database keeps its region (to move, create a new one and restore a backup into it, see [Restoring an export](#restoring-an-export)).
-
-## Where the schema lives
-
-```
-worker/db/schema.ts                         the Drizzle schema: the source of truth
-        │  npm run db:generate  (drizzle-kit generate --config drizzle.d1.config.ts)
-        ▼
-drizzle/<timestamp>_<name>/migration.sql    Drizzle's output (+ snapshot.json for diffing)
-        │  npm run db:sync      (scripts/migrations.mjs, also run by db:generate and build)
-        ▼
-migrations/<timestamp>_<name>.sql           flat files that `wrangler d1 migrations apply` reads
-        │
-        ▼
-worker/migrations.generated.ts              the same SQL embedded for the Pages build's self-migration
+```text
+worker/db/schema.ts
+  → drizzle/<timestamp>_<name>/migration.sql
+  → migrations/<timestamp>_<name>.sql
+  → worker/migrations.generated.ts
 ```
 
-The config is named `drizzle.d1.config.ts` rather than the default `drizzle.config.ts` on purpose, so hosting build steps that auto-run `drizzle-kit` on a default config leave it alone.
-
-## Changing the schema
-
-1. Edit `worker/db/schema.ts`.
-2. Generate the migration:
-
-   ```bash
-   npm run db:generate
-   ```
-
-3. Read the new `drizzle/<timestamp>_<name>/migration.sql`. D1 cannot `ALTER` most column properties, so Drizzle may rebuild a table (create new, copy, drop old, rename). Make sure that is what you want on a table with data.
-4. Apply it locally and run the tests:
-
-   ```bash
-   npm run db:migrate:local
-   npm test
-   ```
-
-5. Commit `worker/db/schema.ts`, `drizzle/`, `migrations/` and `worker/migrations.generated.ts` together. `tests/unit/migrate.test.ts` fails if the embedded copy is out of date.
-6. `npm run deploy` applies it to production before the new code goes live.
-
-### Hand-written SQL (triggers, backfills)
+Generate a schema migration with `npm run db:generate`. Review its SQL, apply it locally and run the relevant tests. `npm run db:sync` copies Drizzle migrations into Wrangler's flat migration directory and embeds them for Pages. The build also runs the sync.
 
 ```bash
-npx drizzle-kit generate --config drizzle.d1.config.ts --custom --name add_some_trigger
+npm run db:generate
+npm run db:migrate:local
+npm test
 ```
 
-creates an empty migration folder. Write the SQL, separating statements with `--> statement-breakpoint` (both Wrangler's and the Pages runner's splitter rely on it; a `CREATE TRIGGER ... BEGIN ... END;` counts as one statement), then `npm run db:sync`.
+Commit the schema, Drizzle output, flat migration and generated embedded file together. Do not edit generated copies by hand. Do not change or remove a migration already applied to a shared or production database; add a new migration instead. Prefer additive changes so old and new Worker versions remain compatible during deployment.
 
-### Rules that keep deploys safe
+## Deploy behavior
 
-- **Never edit or delete a migration that has been deployed.** Add a new one.
-- **Additive first.** Add columns as nullable or with a default; remove old ones in a later release, after no deployed code reads them. During gradual rollouts and on preview URLs, old and new code share one database.
-- **Money invariants live in the database.** Triggers in `*_payment_guards.sql` and `*_fee_triggers_*.sql` abort any write that would over-pay a month. Keep them when you rebuild a table.
+Workers applies pending migrations with `wrangler d1 migrations apply DB --remote` before publishing new code. Pages applies embedded migrations on its first API request and records them in `pos_migrations`. The Pages runner recognizes Wrangler's `d1_migrations` table.
 
-## Applying migrations
+If migration application fails during Workers deployment, the new Worker is not published. Inspect the error and migration state; fix forward with a new migration unless the failed migration has not been applied anywhere and can safely be corrected.
 
-| Command | Database |
-| --- | --- |
-| `npm run db:migrate:local` | `.wrangler/state` (used by `wrangler dev`) |
-| `npm run db:migrate:remote` | production |
-| `npm run db:list` | lists which migrations production has applied |
+## Location, query and consistency constraints
 
-Wrangler records applied files in the `d1_migrations` table. The Pages build records them in `pos_migrations` and also honours `d1_migrations`.
+`npm run cf:setup` defaults to the `apac` location hint; override with `D1_LOCATION` when creating the database. Region is selected at creation and cannot be changed in place.
 
-### When a migration fails
+D1 has no interactive transactions. Use guarded single statements, `db.batch()` or database triggers for operations that must stay consistent. Keep D1's statement parameter limit in mind; the project has a helper for larger `IN` queries.
 
-`wrangler d1 migrations apply` stops at the failing file. `npm run deploy` stops too, so the **old Worker stays live** and nothing is half-deployed. Check what landed with `npm run db:list`, fix the SQL in a **new** migration (or, if the failed one never applied anywhere, correct it), and deploy again.
-
-## Querying production
+## Backup and restore
 
 ```bash
-npx wrangler d1 execute DB --remote --command "SELECT count(*) AS n FROM users"
-npx wrangler d1 execute DB --remote --file ./query.sql
+npm run cf:backup                 # remote SQL export
+npm run cf:backup -- --schema     # schema only
+npm run cf:backup -- --local      # local database
 ```
 
-Or use the dashboard → **Storage & Databases → D1 → pos → Console**. Be careful with writes: there is no undo except Time Travel.
+Exports contain personal data and generated secret material stored in D1. Protect them and keep copies outside the Cloudflare account. Owners can also export their own workspace from the app. D1 Time Travel is useful for point-in-time recovery, but restoring replaces the database state; read Cloudflare's current guidance before using it.
 
-## Backups
+To restore an export, create an empty target database and import the SQL with `wrangler d1 execute <database> --remote --file <backup.sql>`. Update the deployment binding only after checking the restored data and migration records.
 
-### Your own copy
+## Switching between Pages and Workers
+
+Pages records applied migration names in `pos_migrations`; Wrangler uses `d1_migrations`. The Pages runner understands both tables, but Wrangler does not read `pos_migrations`. Before switching from Pages to Workers, back up D1 and copy the applied names so Wrangler does not replay old migrations:
 
 ```bash
-npm run cf:backup                 # full export to backups/pos-remote-<timestamp>.sql
-npm run cf:backup -- --schema     # structure only
-npm run cf:backup -- --local      # the local dev database
+npx wrangler d1 execute DB --remote --command "CREATE TABLE IF NOT EXISTS d1_migrations (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL); INSERT OR IGNORE INTO d1_migrations (name) SELECT name FROM pos_migrations;"
 ```
 
-Keep these somewhere safe; they contain personal data (names, phone numbers, PAN if entered). Owners can also download a JSON backup of their own workspace in the app (**More → Export & backup**).
-
-### Time Travel (point-in-time restore)
-
-D1 keeps a log of every change: 7 days on Workers Free, 30 days on Workers Paid.
-
-```bash
-npx wrangler d1 time-travel info pos                                # current bookmark
-npx wrangler d1 time-travel info pos --timestamp 2026-11-20T06:00:00Z
-npx wrangler d1 time-travel restore pos --timestamp 2026-11-20T06:00:00Z
-```
-
-A restore replaces the **whole** database with its state at that moment; every later change is lost (the command prints a bookmark you can restore to, to undo the restore). Prefer exporting first.
-
-### Restoring an export
-
-Into a new, empty database:
-
-```bash
-npx wrangler d1 create pos-restore
-npx wrangler d1 execute pos-restore --remote --file backups/pos-remote-<timestamp>.sql
-```
-
-then point `database_id` in `wrangler.jsonc` at it and deploy.
-
-## Limits worth knowing
-
-- 100 bound parameters per statement: `worker/db/index.ts` inlines values (safely escaped) for the few bigger `IN (...)` queries.
-- No interactive transactions: use single guarded statements or `db.batch([...])`, which runs as one transaction.
-- Database size: 500 MB on Free, 10 GB on Paid. A workspace with years of rent history is a few MB.
-- See [limits-and-costs.md](limits-and-costs.md) for read/write quotas.
+Verify the resulting migration list with `npm run db:list` before deploying. Do not delete either migration table.

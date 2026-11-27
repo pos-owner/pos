@@ -1,6 +1,6 @@
 // pOS on Cloudflare Workers: one Worker serves the React PWA (static assets from dist/) and the whole API (/api/*).
 //
-//   npm run cf:setup   creates D1, R2 and the queue below (once) and fills in database_id
+//   npm run cf:setup   creates D1 and the queue below (once) and fills in database_id
 //   npm run deploy     builds, applies D1 migrations, deploys
 //
 // Every binding is explained in docs/cloudflare/configuration.md.
@@ -14,7 +14,7 @@
   // https://pos.<your-subdomain>.workers.dev. Set to false once a custom domain is attached (see "routes" below).
   "workers_dev": true,
   // Off: `wrangler versions upload` would otherwise publish a public URL for every version, and those run on the real
-  // D1 and R2. Turn on only if you want per-version previews and accept that.
+  // D1. Turn on only if you want per-version previews and accept that.
   "preview_urls": false,
 
   // Uploads source maps with each deploy so errors in `npm run cf:tail` and the dashboard show the original lines.
@@ -43,8 +43,7 @@
     }
   ],
 
-  // R2: private photo bucket (maintenance, comments, meter photos) and cached PDF reports. Never public.
-  "r2_buckets": [{ "binding": "PHOTOS", "bucket_name": "pos-photos" }],
+  // Photos (maintenance, comments, meter photos) are stored in D1 too (table photo_data), so no R2 bucket is needed.
 
   // Workers AI: reads electricity/water meter photos. Optional; set METER_AI=off to disable.
   "ai": { "binding": "AI" },

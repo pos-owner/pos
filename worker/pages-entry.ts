@@ -4,7 +4,7 @@
  * rent cycle is run by a small separate cron Worker that calls /api/cron/daily (see cloudflare/cron-worker/).
  * _routes.json sends only /api/* here; every other path is a static file (with the single-page-app fallback).
  *
- * Bindings are added in the Pages dashboard (Settings → Bindings): DB (D1), PHOTOS (R2) and, optionally, AI.
+ * Bindings are added in the Pages dashboard (Settings → Bindings): DB (D1) and, optionally, AI. Photos are stored in D1, so no R2 bucket is needed.
  * The D1 schema is created on the first API request (worker/server/core/migrate.ts), so no SQL has to be pasted.
  * Build the upload with `npm run pages:bundle` (see docs/cloudflare/deploy-pages-upload.md).
  */
@@ -22,7 +22,6 @@ export default {
       if (url.pathname === "/api/health") {
         const setup = {
           db: !!env.DB,
-          photos: !!env.PHOTOS,
           ai: !!env.AI,
           cronSecret: typeof env.CRON_SECRET === "string",
         };
@@ -35,13 +34,11 @@ export default {
             console.error("schema setup failed", e);
           }
         }
-        return json({ ok: setup.db && setup.photos && schema, schema, ...setup });
+        return json({ ok: setup.db && schema, schema, ...setup });
       }
-      if (!env.DB || !env.PHOTOS) {
+      if (!env.DB) {
         return json(
-          {
-            error: `Setup is not finished: connect the ${[!env.DB && "D1 database (DB)", !env.PHOTOS && "R2 bucket (PHOTOS)"].filter(Boolean).join(" and ")} under Settings → Bindings, then redeploy.`,
-          },
+          { error: "Setup is not finished: connect the D1 database (DB) under Settings → Bindings, then redeploy." },
           503,
         );
       }

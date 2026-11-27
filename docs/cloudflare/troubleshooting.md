@@ -1,62 +1,40 @@
 # Troubleshooting
 
-Find the message or symptom, apply the fix. For anything not listed, `npm run cf:tail` while reproducing the problem usually shows the cause.
+Start with `npm run cf:tail` for a Workers deployment or the Pages function logs. For a running site, `npm run smoke -- https://your-app.example` checks health, static assets and security headers.
 
-## Setup and deploy
+## Setup and deployment
 
-| Message / symptom | Cause and fix |
+| Symptom | Check |
 | --- | --- |
-| `You are not authenticated` / `Not logged in` | `npm run cf:login`, or set `CLOUDFLARE_API_TOKEN` (+ `CLOUDFLARE_ACCOUNT_ID`) |
-| `More than one account available` | Set `CLOUDFLARE_ACCOUNT_ID` to the account you want |
-| `Please enable R2 through the Cloudflare Dashboard` | Dashboard → R2 Object Storage → enable once, then `npm run cf:setup` again |
-| `Couldn't create D1 "pos"` | Name already used in another account you can see, or token lacks D1 Edit. Change `database_name` or fix the token |
-| `binding DB of type d1 must have a valid id` | `database_id` is still the zero placeholder: run `npm run cf:setup` |
-| `Queue "pos-daily" does not exist` | Run `npm run cf:setup` (it creates the queue) before `wrangler deploy` |
-| `The directory specified by the "assets.directory" field ... does not exist` | Run `npm run build` first (`npm run deploy` does) |
-| `A request to the Cloudflare API ... failed ... code 10021` / script validation error | Usually a runtime import problem; run `npm run deploy:dry` locally to see the bundling error |
-| Migration fails during `npm run deploy` | The Worker was not deployed; the old version is still live. See [database-d1.md](database-d1.md#when-a-migration-fails) |
-| `Your Worker exceeded the size limit` | Check `npm run deploy:dry` output size; the API bundle is normally well under the Free 3 MB limit |
-| GitHub Actions: `npm ci` lockfile error | `npm install` locally and commit `package-lock.json` |
+| Authentication or account selection error | Run `npm run cf:whoami`; check token permissions and `CLOUDFLARE_ACCOUNT_ID`. |
+| D1 binding has an invalid id | Run `npm run cf:setup` or correct `database_id` in `wrangler.jsonc`. |
+| Queue does not exist | Run `npm run cf:setup` before deploying Workers. |
+| Static asset directory is missing | Run `npm run build`; `npm run deploy` does this automatically. |
+| Migration failed | The Workers deployment stops before publishing new code. Inspect the migration and D1 state; see [D1](database-d1.md). |
+| CI install fails on lockfile | Update and commit `package-lock.json` with `npm install`. |
 
-## Running app
+## App behavior
 
-| Symptom | Cause and fix |
+| Symptom | Check |
 | --- | --- |
-| App loads but every action fails, `/api/health` 404s | The Worker is not handling `/api/*`. On Workers, check `assets.run_worker_first` in `wrangler.jsonc`. On Pages, the zip lacks `_worker.js`: rebuild with `npm run pages:bundle` |
-| `/api/...` returns `503 Setup is not finished` | Pages only: D1 (`DB`) or R2 (`PHOTOS`) binding missing. Add it and **redeploy** |
-| `The database could not be set up` | Pages only: a migration failed on first request. Open `/api/health` and the deployment's logs |
-| `no such table: ...` | Workers: migrations not applied to this database. `npm run db:migrate:remote` |
-| Reloading `/tenants/42` shows a 404 | SPA fallback off. Workers: `not_found_handling: "single-page-application"`. Pages: make sure there is no `404.html` in `dist/` |
-| Signed out on every visit | Mixing addresses (workers.dev vs custom domain): the cookie is per host. Use one address; set `APP_URL` to it |
-| Photos show "Link expired" | Signed links are short-lived; refresh the screen. If it persists, `SIGNING_SECRET` changed between instances; set it once as a secret |
-| Photos fail to upload | Over 6 MB, or not JPEG/PNG/WebP. Check R2 binding on Pages |
-| Meter scan unavailable | No `AI` binding, or `METER_AI=off` ([workers-ai.md](workers-ai.md)) |
-| "Forgot password?" says email isn't set up | Expected without email; use reset links ([email.md](email.md)) |
-| Old version keeps showing after deploy | The service worker updates in the background; close and reopen the app (installed) or reload twice |
-| `Exceeded CPU Limit` in logs | Free plan 10 ms CPU; see [limits-and-costs.md](limits-and-costs.md#when-to-move-to-workers-paid) |
-| `429 Too many attempts` | Rate limit hit; wait for the window (minutes to an hour) |
+| `/api/health` is unhealthy | Confirm the `DB` binding and inspect D1/Worker logs. On Pages, also check `schema` in the response. |
+| `/api/*` returns a static page or 404 | Check Workers `assets.run_worker_first` or Pages `_routes.json`; rebuild the Pages bundle. |
+| API says setup is unfinished on Pages | Add the D1 binding with the exact name `DB`, then redeploy. |
+| Deep link returns 404 | Check SPA fallback and ensure a Pages `404.html` is not overriding it. |
+| Signed photo link fails | Refresh to get a new link; confirm the signing secret was not changed between deployments. |
+| Photo upload is rejected | Check that it is JPEG, PNG or WebP and at most 1,200,000 bytes. |
+| Meter photo scan is unavailable | Check the `AI` binding and `METER_AI`; local development omits AI by default. |
+| Reset screen says email is unavailable | Email is optional; use an owner-generated reset link or configure the Email binding. |
+| API returns 429 | A rate limit was reached; wait for its window to expire. |
 
-## Daily cycle
+## Daily processing
 
-| Symptom | Cause and fix |
+| Symptom | Check |
 | --- | --- |
-| No new month's charges | Check Workers → pos → Triggers shows `30 0 * * *`; look for `daily cycle` in Observability. Run by hand ([cron-and-queues.md](cron-and-queues.md#run-it-by-hand)) |
-| Cron runs but nothing per workspace | Queue consumer missing: `queues.consumers` in `wrangler.jsonc`, then deploy |
-| Manual run answers `403 Forbidden` | `CRON_SECRET` not set, or header value differs |
-| Pages cron Worker: `Set the APP_URL and CRON_SECRET variables` | Add both to the `pos-daily-cron` Worker |
-| Pages cron Worker: `?list=1 -> 403` | `CRON_SECRET` differs between the Pages project and the cron Worker |
-| Some workspaces skipped on Pages | More than ~45 workspaces: switch to the Workers deployment |
+| Rent charges were not created | Confirm the Cron Trigger and review the daily-cycle logs. |
+| Cron ran but workspace work is missing | Confirm the Workers Queue consumer is configured and the queue has no stuck failures. |
+| Manual daily endpoint returns 403 | Confirm `CRON_SECRET` and the `x-cron-secret` header match. |
+| Pages scheduler reports missing variables | Set matching `APP_URL` and `CRON_SECRET` on the Pages app and companion Worker. |
+| Pages does not process every workspace | The helper caps one run at 45 workspaces; move to Workers Queue processing for larger portfolios. |
 
-## Local development
-
-See [local-development.md](local-development.md#common-local-problems).
-
-## Getting more detail
-
-```bash
-npx wrangler tail --status error --format pretty
-npx wrangler d1 execute DB --remote --command "SELECT * FROM d1_migrations"
-npx wrangler deployments list
-```
-
-Dashboard → pos → **Observability** shows each request's logs, status and timing.
+For local problems, see [local development](local-development.md).

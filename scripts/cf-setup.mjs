@@ -1,4 +1,4 @@
-// One-time Cloudflare setup: creates the D1 database, the R2 photo bucket and the daily queue named in
+// One-time Cloudflare setup: creates the D1 database and the daily queue named in
 // wrangler.jsonc, then writes the new database_id into wrangler.jsonc. Safe to re-run: anything that already exists
 // is left alone. Needs `npx wrangler login` (or CLOUDFLARE_API_TOKEN) first.
 //
@@ -12,7 +12,6 @@ const config = await readFile(file, "utf8");
 
 const pick = (re, fallback) => config.match(re)?.[1] ?? fallback;
 const dbName = pick(/"database_name"\s*:\s*"([^"]+)"/, "pos");
-const bucket = pick(/"bucket_name"\s*:\s*"([^"]+)"/, "pos-photos");
 const queue = pick(/"queue"\s*:\s*"([^"]+)"/, "pos-daily");
 const PLACEHOLDER = "00000000-0000-0000-0000-000000000000";
 
@@ -53,14 +52,6 @@ if (id === PLACEHOLDER) {
   console.log(`database_id written to wrangler.jsonc`);
 } else {
   console.log(`D1 "${dbName}" already set in wrangler.jsonc`);
-}
-
-// R2
-{
-  const r = wrangler("r2", "bucket", "create", bucket);
-  if (r.ok) console.log(`R2 bucket "${bucket}" created`);
-  else if (exists(r.out)) console.log(`R2 bucket "${bucket}" already exists`);
-  else throw new Error(`Couldn't create R2 bucket "${bucket}":\n${r.out}`);
 }
 
 // Queues

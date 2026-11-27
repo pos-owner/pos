@@ -36,6 +36,7 @@ import { ChargeSheet, chargeSub } from "./ChargeSheet";
 import { AwaitingCard, pendingOf } from "./confirm";
 import { Bell } from "../../components/Bell";
 import { OutboxButton } from "../../components/OutboxButton";
+import { openQuickSearch } from "../../components/QuickSearch";
 import "../../styles/owner.css";
 
 /**
@@ -57,6 +58,7 @@ export default function OwnerHome() {
   const settings = (
     <>
       <OutboxButton />
+      <NavButton icon="search" label="Search" onClick={() => openQuickSearch()} />
       <Bell />
       <NavButton icon="gear" label="Settings" onClick={() => nav("/settings")} />
     </>

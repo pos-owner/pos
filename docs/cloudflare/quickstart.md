@@ -1,81 +1,42 @@
-# Quickstart: pOS live on Cloudflare in ten minutes
+# Quickstart: deploy pOS to Workers
 
-You need a free [Cloudflare account](https://dash.cloudflare.com/sign-up) and Node.js 22.18+ (24 recommended).
+You need a Cloudflare account, Node.js 22.18 or newer and this repository.
 
-## 1. Install
-
-```bash
-npm install
-```
-
-## 2. Log in to Cloudflare
+## 1. Install and authenticate
 
 ```bash
+npm ci
 npm run cf:login
+npm run cf:whoami
 ```
 
-A browser window opens; approve access. Check it worked with `npm run cf:whoami`.
+If you use multiple Cloudflare accounts, set `CLOUDFLARE_ACCOUNT_ID` to select the intended account.
 
-> If you have more than one Cloudflare account, set `CLOUDFLARE_ACCOUNT_ID` in your shell first so every command targets the right one.
-
-## 3. Create the resources
+## 2. Create resources
 
 ```bash
 npm run cf:setup
 ```
 
-This creates, or finds if they already exist:
+This safely creates or finds the D1 database and `pos-daily` queue declared in `wrangler.jsonc`. It writes a real D1 id when the config still has its placeholder. The default D1 location hint is `apac`; choose the location before creating a production database because it cannot be changed in place.
 
-- the D1 database **`pos`**, and writes its id into `wrangler.jsonc`
-- the R2 bucket **`pos-photos`**
-- the queue **`pos-daily`**
-
-R2 must be enabled once per account. If the script says R2 is not enabled, open **Cloudflare dashboard → R2 Object Storage**, accept the terms (the free tier needs no payment for this usage, but Cloudflare may ask for a card on file), and re-run the command.
-
-Commit the changed `wrangler.jsonc` so everyone deploys to the same database.
-
-## 4. Add the one secret you should set now
+## 3. Set the cron secret and deploy
 
 ```bash
 npm run cf:secret -- CRON_SECRET
-```
-
-Paste any long random string (for example from `openssl rand -base64 32`). It protects the manual daily-cycle endpoint. Everything else has a safe default; see [configuration.md](configuration.md).
-
-## 5. Deploy
-
-```bash
 npm run deploy
 ```
 
-This builds the app, applies every D1 migration to the production database, and deploys the Worker. The last lines print your address:
+The secret protects manual daily-job requests. The configured Cron Trigger does not use it. Deployment builds the app, applies remote D1 migrations, then deploys the Worker.
 
-```
-Deployed pos triggers
-  https://pos.<your-subdomain>.workers.dev
-  schedule: 30 0 * * *
-  Consumer for pos-daily
-```
+## 4. Set up the first owner
 
-## 6. Try it
+Open `https://pos.<your-subdomain>.workers.dev`, create an owner account and complete onboarding. Check `https://pos.<your-subdomain>.workers.dev/api/health`; a healthy Workers response reports both `ok` and `db` as true.
 
-1. Open `https://pos.<your-subdomain>.workers.dev/api/health`; it should answer `{"ok":true}`.
-2. Open the address itself, choose **Create account** and set up your owner workspace.
-3. Add a property and a unit, then invite a tenant from **More → Invites & people**.
-4. On a phone, use **Add to Home Screen** to install it as an app.
+Once the intended owner accounts exist, set `SIGNUPS` to `closed` in `wrangler.jsonc` and deploy again if public owner registration is not desired. Invitations for staff and tenants continue to work.
 
-## 7. Before you share it
+## 5. Prepare for real use
 
-- Close owner sign-ups if only you should own a workspace: set `"SIGNUPS": "closed"` in `wrangler.jsonc` and deploy again.
-- Go through [deploy-checklist.md](deploy-checklist.md).
-- Optionally attach your own domain ([custom-domain.md](custom-domain.md)) and set up password-reset emails ([email.md](email.md)).
+Review the [go-live checklist](deploy-checklist.md), set `APP_URL` when using a custom domain, and configure optional email or AI if needed. Photos are stored in D1, so this setup does not require an R2 bucket.
 
-## Next deploys
-
-Every later change is just:
-
-```bash
-npm run deploy
-```
-
-Want this to happen on every push instead? See [deploy-github-actions.md](deploy-github-actions.md).
+For automatic deployments, see [GitHub Actions](deploy-github-actions.md). To use dashboard uploads instead, follow [Pages deployment](deploy-pages-upload.md).

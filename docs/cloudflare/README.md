@@ -1,54 +1,31 @@
-# pOS on Cloudflare
+# Cloudflare deployment and operations
 
-Guides for deploying and running pOS on Cloudflare. New here? Start with the **quickstart**.
+The recommended setup is Cloudflare Workers: one Worker serves both the PWA and `/api/*`, while Cron and Queues run the daily job. Pages upload is an alternative with a separate cron Worker.
 
 ## Deploy
 
-| Guide | When to use it |
+| Guide | Use it for |
 | --- | --- |
-| [quickstart.md](quickstart.md) | From zero to a live app in about ten minutes |
-| [deploy-workers.md](deploy-workers.md) | The recommended method: Workers + Wrangler CLI, every option explained |
-| [deploy-github-actions.md](deploy-github-actions.md) | Automatic deploys on every push to `main` |
-| [deploy-pages-upload.md](deploy-pages-upload.md) | Upload a zip in the dashboard, no terminal on Cloudflare's side |
-| [deploy-checklist.md](deploy-checklist.md) | Tick through before real people use it |
+| [Quickstart](quickstart.md) | First Workers deployment |
+| [Workers and Wrangler](deploy-workers.md) | Full CLI deployment reference |
+| [GitHub Actions](deploy-github-actions.md) | CI checks and automated deploys |
+| [Pages upload](deploy-pages-upload.md) | Dashboard-based static upload |
+| [Go-live checklist](deploy-checklist.md) | Production readiness |
 
-## Configure
+## Configure and operate
 
-| Guide | Covers |
+| Guide | Topic |
 | --- | --- |
-| [configuration.md](configuration.md) | Every binding, variable and secret, in one table |
-| [custom-domain.md](custom-domain.md) | `pos.example.com` instead of `workers.dev` |
-| [email.md](email.md) | "Forgot password?" emails through Cloudflare Email Service |
-| [web-push.md](web-push.md) | Push notifications and VAPID keys |
-| [workers-ai.md](workers-ai.md) | Meter-photo reading with Workers AI |
-
-## Data
-
-| Guide | Covers |
-| --- | --- |
-| [database-d1.md](database-d1.md) | Schema changes, migrations, backups, Time Travel restores |
-| [storage-r2.md](storage-r2.md) | The private photo bucket |
-| [cron-and-queues.md](cron-and-queues.md) | The daily rent cycle: Cron Trigger, Queue, manual runs |
-
-## Operate
-
-| Guide | Covers |
-| --- | --- |
-| [local-development.md](local-development.md) | `wrangler dev`, Miniflare, local D1 and R2, tests |
-| [operations.md](operations.md) | Logs, rollbacks, health checks, emergency reset links |
-| [security.md](security.md) | Headers, cookies, secrets, API token scope |
-| [limits-and-costs.md](limits-and-costs.md) | What fits on the Free plan, and when to upgrade |
-| [troubleshooting.md](troubleshooting.md) | Error messages and their fixes |
-
-## Which deploy method?
-
-```
-Do you have a terminal with Node.js?
-├── yes → Do you want deploys on every git push?
-│         ├── yes → GitHub Actions          (deploy-github-actions.md)
-│         └── no  → Workers + Wrangler      (deploy-workers.md)   ← recommended
-└── no  → Pages drag-and-drop               (deploy-pages-upload.md)
-          (someone still runs `npm run pages:bundle` once to make the zip)
-```
-
-Workers is preferred because it has the Cron Trigger and Queue built in, applies migrations before the new code goes live, supports gradual rollouts and one-command rollbacks, and keeps every binding in version-controlled `wrangler.jsonc`.
+| [Configuration](configuration.md) | Bindings, variables, secrets |
+| [Custom domain](custom-domain.md) | Domain and TLS |
+| [Email](email.md) | Optional password-reset email |
+| [Web Push](web-push.md) | Browser push notifications |
+| [Workers AI](workers-ai.md) | Optional meter-photo reading |
+| [D1](database-d1.md) | Schema, migrations and backup |
+| [Photos](storage-photos.md) | Private photos stored in D1 |
+| [Cron and Queues](cron-and-queues.md) | Daily rent processing |
+| [Local development](local-development.md) | Miniflare, D1 and tests |
+| [Operations](operations.md) | Health, logs, backups and recovery |
+| [Security](security.md) | Application and account safeguards |
+| [Limits and costs](limits-and-costs.md) | Capacity planning |
+| [Troubleshooting](troubleshooting.md) | Common problems |

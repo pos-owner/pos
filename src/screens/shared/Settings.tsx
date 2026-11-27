@@ -22,6 +22,7 @@ import { I } from "../../components/icons";
 import PanSection from "./settings/PanSection";
 import NotificationSection from "./settings/NotificationSection";
 import LanguageSection from "./settings/LanguageSection";
+import DisplaySection from "./settings/DisplaySection";
 import { useT } from "../../lib/i18n";
 
 const ROLE_LABEL = { owner: "Owner", staff: "Staff", tenant: "Tenant" } as const;
@@ -178,21 +179,14 @@ export default function Settings() {
 
       <NotificationSection />
       <LanguageSection />
+      <DisplaySection />
       <PanSection />
 
       <Section
-        title="Appearance"
+        title="Performance"
         footer="Lite mode turns off the frosted-glass blur for smoother scrolling on older phones. Auto picks it for you."
       >
-        <div className="list icons">
-          <Row
-            icon="sparkle"
-            iconBg="var(--indigo)"
-            title="Light and dark"
-            sub="Follows your phone's setting automatically"
-          />
-        </div>
-        <div className="mt12">
+        <div>
           <Segmented
             label="Performance"
             value={perf}

@@ -1,57 +1,15 @@
 # Web Push notifications
 
-pOS sends push notifications (rent due, payment confirmed, request updates and so on) to installed apps and browsers that allow them. It works on Android, desktop browsers, and on iPhone/iPad once the app is added to the Home Screen (iOS 16.4+).
+pOS can send rent reminders, payment updates and other notifications to supported browsers and installed apps. iOS requires the app to be added to the Home Screen and a supported OS version.
 
-There are no third-party services or SDKs: `worker/server/core/webpush.ts` implements VAPID (RFC 8292) and payload encryption (RFC 8291) with WebCrypto, which Workers provide natively.
+The Worker implements VAPID and payload encryption with Web Crypto. On first use, it can create a VAPID key pair and store it in D1. To manage keys yourself, set both `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` as Worker secrets; optionally configure `VAPID_SUBJECT` as a contact URI. Do not configure only one key.
 
-## Zero setup by default
+The browser retrieves the public key from `/api/push/key`, subscribes through its service worker and posts the endpoint and keys to `/api/push/subscribe`. Subscriptions and notifications are stored in D1. The service worker in `public/push-sw.js` displays incoming notifications and handles clicks.
 
-On the first push-related request, pOS generates a VAPID key pair and stores it in D1 (`app_secrets`). Every later request reuses it. Nothing needs configuring.
+Users can enable notifications and send themselves a test in Settings. The service worker and browser must be allowed to show notifications by the operating system.
 
-## Bring your own keys (optional)
+## Privacy and endpoint validation
 
-Set your own keys when you want them to survive a database rebuild, or to share them across environments:
+The Worker sends encrypted payloads to push-service endpoints; browsers do not make those requests from the page. The API validates endpoint URLs against supported push-service hosts. Keep that validation in sync if browser support is deliberately expanded.
 
-```bash
-npx web-push generate-vapid-keys --json      # or any VAPID key generator
-npm run cf:secret -- VAPID_PUBLIC_KEY         # the "publicKey" value (base64url)
-npm run cf:secret -- VAPID_PRIVATE_KEY        # the "privateKey" value (base64url)
-```
-
-Optionally set a contact the push services can reach you at:
-
-```jsonc
-"vars": { "VAPID_SUBJECT": "mailto:you@example.com" }
-```
-
-Without it pOS uses `APP_URL`. Changing keys later means existing subscriptions stop working; devices resubscribe the next time the app opens and asks.
-
-## How it fits together
-
-```
-app → GET  /api/push/key          VAPID public key
-    → browser subscribes (service worker: public/push-sw.js imported by the generated sw.js)
-    → POST /api/push/subscribe    endpoint + keys stored in D1
-event → notification row in D1 → sent right away or by the daily cycle
-    → POST to the browser vendor's push endpoint (FCM, Mozilla, Apple)
-    → push-sw.js shows it; tapping opens the right screen
-```
-
-People can send themselves a test from **Settings** (notifications section, `POST /api/push/test`).
-
-## Content Security Policy
-
-`public/_headers` allows `connect-src 'self'` and `worker-src 'self' blob:`. The app and its service worker only talk to their own origin (subscribing to push goes through the browser, not through `connect-src`), so keep `worker-src` as it is.
-
-## Accepted push services
-
-A subscription's endpoint is a URL the Worker later POSTs to, so `POST /api/push/subscribe` only accepts https endpoints without credentials on the default port, on the hosts of the push services browsers use: `fcm.googleapis.com` (Chrome, Edge, Brave, Opera, Samsung Internet), `*.push.services.mozilla.com` (Firefox), `*.notify.windows.com` and `*.push.apple.com` (Safari). The list is `PUSH_HOSTS` in `worker/server/core/webpush.ts`; add a host there if a browser you support uses another one.
-
-## Troubleshooting
-
-| Symptom | Cause |
-| --- | --- |
-| No prompt on iPhone | Push only works once the app is added to the Home Screen and opened from there |
-| Test says sent, nothing appears | OS-level notifications disabled for the browser, or Focus/Do Not Disturb |
-| Stopped after changing keys | Old subscriptions are tied to the old key; reopen the app to resubscribe |
-| `410 Gone` in logs | The device unsubscribed; pOS removes that subscription |
+Changing the VAPID key pair invalidates existing subscriptions. Devices need to open the app and subscribe again.

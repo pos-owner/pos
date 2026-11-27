@@ -4,9 +4,11 @@ import { registerSW } from "virtual:pwa-register";
 import App from "./App";
 import { warmApi } from "./lib/api";
 import { applyPerf } from "./lib/perf";
+import { applyDisplay } from "./lib/display";
 import "./styles/global.css";
 
 applyPerf();
+applyDisplay();
 // Start waking the API now so its cold start overlaps with the app starting, not with the first request.
 warmApi();
 

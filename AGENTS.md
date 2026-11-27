@@ -1,6 +1,6 @@
 # AGENTS.md
 
-pOS is a React PWA plus a Hono API that runs on Cloudflare. One Worker serves the static assets in `dist/` and handles `/api/*`. The data lives in D1 and R2, the daily job runs on Cron plus Queues, and meter photos are read by Workers AI. Full docs are in `docs/`, starting at `docs/README.md`.
+pOS is a React PWA plus a Hono API that runs on Cloudflare. One Worker serves the static assets in `dist/` and handles `/api/*`. The data and photos live in D1 (no R2), the daily job runs on Cron plus Queues, and meter photos are read by Workers AI. Full docs are in `docs/`, starting at `docs/README.md`.
 
 ## Key directories
 - `src/`: the React app (screens grouped by role: owner, staff, tenant, shared, tools).
@@ -23,3 +23,6 @@ pOS is a React PWA plus a Hono API that runs on Cloudflare. One Worker serves th
 
 ## Commands
 `npm run dev:api` + `npm run dev`, `npm test`, `npm run check`, `npm run verify`, `npm run smoke`, `npm run deploy`.
+
+## Ongoing work
+See `PLAN.md` for the upgrade milestones (done and remaining). Display preferences live in `src/lib/display.ts` (data attributes on `<html>`, CSS at the end of `src/styles/global.css`); dark-mode rules must cover both `@media (prefers-color-scheme: dark)` with `:root:not([data-theme="light"])` and `:root[data-theme="dark"]`. The receipt slip is drawn in `shared/pdf/receipt.ts`; the shared logo is `drawLogo` in `shared/pdf/writer.ts`.

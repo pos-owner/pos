@@ -35,3 +35,4 @@ FROM `tenancies` tn
 JOIN `units` u ON u.`id` = tn.`unit_id`
 JOIN `properties` p ON p.`id` = u.`property_id`
 WHERE NOT EXISTS (SELECT 1 FROM `lease_terms` lt WHERE lt.`tenancy_id` = tn.`id`);
+

@@ -1,53 +1,38 @@
-# Go-live checklist
+# Production readiness checklist
 
-Tick these before real owners, staff and tenants use pOS.
+Use this checklist before real owners, staff or tenants rely on the deployment.
 
-## Cloudflare account
+## Account and resources
 
-- [ ] Two-factor authentication on for every account member
-- [ ] R2 enabled; D1 `pos`, R2 `pos-photos` and queue `pos-daily` exist (`npm run cf:setup`)
-- [ ] Real `database_id` committed in `wrangler.jsonc`
-- [ ] D1 was created in the right region (`apac` by default, see [database-d1.md](database-d1.md#where-the-database-lives)); it cannot be changed later
-- [ ] Usage notifications set under Billing (optional but recommended)
+- [ ] Enable two-factor authentication for Cloudflare account members.
+- [ ] Create the D1 database and `pos-daily` queue for Workers, or D1 for Pages.
+- [ ] Confirm D1's location before creating a production database.
+- [ ] Set a billing or usage alert appropriate to the account.
 
 ## Configuration
 
-- [ ] `CRON_SECRET` set as a secret (`npm run cf:secret -- CRON_SECRET`)
-- [ ] `SIGNING_SECRET` set as a secret (optional; otherwise generated in D1)
-- [ ] `APP_URL` set to the public address if you use a custom domain, and also set as a build variable so WhatsApp link previews get an absolute image URL
-- [ ] `SIGNUPS` set to `closed` once your owner account exists, unless others should start workspaces
-- [ ] `METER_AI` on or off as you intend
-- [ ] Email configured, or the team knows how to make reset links ([email.md](email.md))
-- [ ] Nothing secret in `wrangler.jsonc`, `.dev.vars.example` or git history
+- [ ] Set a strong `CRON_SECRET`; on Pages, set the same value on the companion cron Worker.
+- [ ] Set `APP_URL` to the public address when using a custom domain.
+- [ ] Close owner sign-ups with `SIGNUPS=closed` if public workspace creation is not intended.
+- [ ] Decide whether meter-photo AI and email are enabled.
+- [ ] Confirm no secrets are present in configuration files or git history.
 
-## Deploy
+## Deploy and verify
 
-- [ ] `npm run verify` passes (types, tests, dry-run bundle)
-- [ ] `npm run deploy` finished; `npm run db:list` shows every migration applied
-- [ ] `npm run smoke -- https://your-address` passes (`GET /api/health` → `{"ok":true,"db":true}`; it returns 503 if D1 is unreachable, so point an uptime monitor at it)
-- [ ] Workers → pos → Triggers shows the cron `30 0 * * *` and the queue consumer
-- [ ] Observability enabled and showing requests
+- [ ] `npm run verify` passes.
+- [ ] Deployment completes and all intended D1 migrations are applied.
+- [ ] `/api/health` reports a healthy database.
+- [ ] Workers shows the expected `30 0 * * *` trigger and queue consumer, or the Pages companion Cron Trigger is active.
+- [ ] Observability logs are available.
+- [ ] Run `npm run smoke -- https://your-app.example` after deployment.
 
-## Domain (if custom)
+## Product and recovery
 
-- [ ] `https://pos.example.com` loads with a valid certificate
-- [ ] SSL/TLS mode **Full (strict)**, **Always Use HTTPS** on
-- [ ] HSTS `includeSubDomains` is acceptable for this domain ([custom-domain.md](custom-domain.md#security-headers-and-hsts))
-- [ ] `workers_dev: false` once the domain works (optional)
+- [ ] Test owner onboarding, property/unit creation and invitation acceptance.
+- [ ] Test a tenant payment claim and owner confirmation; verify the receipt.
+- [ ] Test a maintenance photo upload and access from the appropriate roles.
+- [ ] Test push notifications and the installed app on a target device.
+- [ ] Take a D1 backup and store it outside Cloudflare.
+- [ ] Document who can deploy, restore, rotate secrets and create emergency reset links.
 
-## Smoke test in the app
-
-- [ ] Create an account, finish onboarding (try sample data on a test account)
-- [ ] Add a property and unit; invite a tenant; accept the invite on another device
-- [ ] Tenant marks a payment as paid; owner confirms it; receipt PDF opens
-- [ ] Upload a request photo; it shows for both owner and tenant
-- [ ] Turn on notifications and send a test from Settings
-- [ ] Install the app on a phone (Add to Home Screen) and open it offline
-- [ ] Run the daily cycle once by hand and check the log line ([cron-and-queues.md](cron-and-queues.md#run-it-by-hand))
-
-## Operations
-
-- [ ] First backup taken (`npm run cf:backup`) and stored somewhere safe
-- [ ] A reminder to back up regularly
-- [ ] Someone knows how to roll back (`npm run cf:rollback`) and make an emergency reset link
-- [ ] If using GitHub Actions: secrets set, `production` environment reviewers configured (optional)
+For a custom domain, also review the HSTS notes in [custom-domain](custom-domain.md).

@@ -1,99 +1,63 @@
 # Local development
 
-Everything runs on your machine with Miniflare, the same runtime that powers `wrangler dev`. Local D1 and R2 live in `.wrangler/state/` and never touch your Cloudflare account. The one exception is Workers AI, which has no local emulation: `npm run dev:api` therefore starts the Worker without the AI binding, so no Cloudflare login is needed (see below for how to keep it).
+The local Worker runs with Wrangler/Miniflare and a local D1 database. It does not use your production database or require Cloudflare authentication for normal development.
 
-## Setup
+## Install and start
+
+Use Node.js 22.18 or newer, then:
 
 ```bash
-nvm use               # Node 24 from .nvmrc (22.18+ works)
-npm install
-cp .dev.vars.example .dev.vars   # optional: local values for secrets
+npm ci
+cp .dev.vars.example .dev.vars   # optional
+npm run dev:api                  # terminal 1, Worker at :8787
+npm run dev                      # terminal 2, Vite at :5173
 ```
 
-## Two ways to run
+Open `http://localhost:5173`. Vite proxies `/api` to the local Worker so the app remains same-origin. Set `POS_API=http://localhost:9000` if the API runs on another port.
 
-### Hot reload (day-to-day)
+`dev:api` creates a generated, git-ignored `wrangler.dev.jsonc` without the Workers AI binding. To make real AI requests, authenticate with `npm run cf:login` and run `npm run dev:api -- --ai`; AI requests then use your Cloudflare account and may incur usage.
+
+## Production-like preview
 
 ```bash
-npm run dev:api       # terminal 1 → http://localhost:8787  (Worker, local D1 + R2, migrations applied)
-npm run dev           # terminal 2 → http://localhost:5173  (Vite; /api is proxied to :8787)
+npm run preview
 ```
 
-Open `http://localhost:5173`. Front-end edits reload instantly; Worker edits restart `wrangler dev` automatically. The browser sees a single origin, so the session cookie behaves as in production.
+This builds the PWA and serves it through Wrangler's static assets behavior. Use it to validate installability, headers, SPA fallback and offline shell behavior. `npm run smoke` runs read-only checks against the default local URL; pass a URL to check another deployment.
 
-`POS_API=http://localhost:9000 npm run dev` points the proxy somewhere else.
+## Local D1 and scheduled job
 
-`dev:api` runs Wrangler from `wrangler.dev.jsonc`, a copy of `wrangler.jsonc` without the `ai` binding that it rewrites on every start (git-ignored). Without that, Wrangler asks for a Cloudflare login as soon as an AI binding exists, even if nothing calls it, and `METER_AI=off` does not prevent it. The app treats the missing binding as "meter scanning unavailable". To try real meter scans, run `npm run cf:login` once and then `npm run dev:api -- --ai`; those calls go to your Cloudflare account and count toward usage. Other arguments are passed on to `wrangler dev` (for example `--port 9000`).
-
-### Production build (before you deploy)
+Local D1 data lives under `.wrangler/state/`. Apply migrations with `npm run db:migrate:local`. To inspect it:
 
 ```bash
-npm run preview       # build, migrate local D1, wrangler dev → http://localhost:8787
-```
-
-This serves `dist/` through Workers static assets exactly as Cloudflare will, including the SPA fallback and `_headers`. Use it to check the service worker, install prompt and offline behaviour, which Vite's dev server does not reproduce.
-
-With either server running, `npm run smoke` checks health (including a D1 query), the static files and the security headers. Add `-- --write` to also sign up a throwaway account and call `/api/me` with it.
-
-## Local database
-
-```bash
-npm run db:migrate:local
 npx wrangler d1 execute DB --local --command "SELECT id, email FROM users"
 npm run cf:backup -- --local
 ```
 
-To start over, stop `wrangler dev` and delete `.wrangler/state/`.
-
-The app can fill a new workspace with sample data during onboarding (`worker/server/domain/seed.ts`), which is the quickest way to see every screen populated.
-
-## Testing the scheduled job locally
+To simulate the scheduled event, run `npx wrangler dev --test-scheduled` and request:
 
 ```bash
-npx wrangler dev --test-scheduled
-curl "http://localhost:8787/__scheduled?cron=30+0+*+*+*"
+curl 'http://localhost:8787/__scheduled?cron=30+0+*+*+*'
 ```
 
-Or call the endpoint with the local secret from `.dev.vars`:
+Or call the protected API with the local `CRON_SECRET` value from `.dev.vars`.
+
+## Checks
 
 ```bash
-curl -X POST http://localhost:8787/api/cron/daily -H "x-cron-secret: local-cron-secret"
+npm run check
+npm test
+npm run verify
 ```
 
-Locally, queue messages are delivered by Miniflare to the same Worker's `queue` handler.
+Unit tests cover isolated business logic; API tests start the Hono app against Miniflare D1 with migrations applied. Each API test fixture uses its own database.
 
-## Emergency reset link, locally
+## Common issues
 
-```bash
-npm run cf:reset-link -- you@example.com --local
-```
-
-## Tests
-
-```bash
-npm test              # every tests/**/*.test.ts with Node's test runner
-npm run check         # TypeScript across src, worker, shared, tests and configs
-npm run verify        # check + test + dry-run Worker bundle (what CI runs)
-```
-
-- `tests/unit/` covers pure logic: rent dates, billing, allocation of payments across months, access rules, i18n, the migration runner.
-- `tests/api/` runs the real Hono API in Node against Miniflare's D1 and R2 with every migration applied: routes, constraints, rate limits, concurrent payments. Each file gets a fresh database.
-
-Node runs the TypeScript directly (type stripping, Node 22.18+), so there is no test build step. Because of that, source files keep explicit `.ts` extensions in imports and avoid TypeScript-only runtime syntax such as `enum` and `namespace`.
-
-## Inspecting things
-
-- `wrangler dev` prints a local URL; press `d` in its terminal for DevTools attached to the Worker (breakpoints, console, profiler).
-- `.wrangler/state/v3/d1/` holds the local SQLite files; any SQLite browser can open them read-only.
-
-## Common local problems
-
-| Symptom | Fix |
+| Symptom | Resolution |
 | --- | --- |
-| `assets.directory ... does not exist` | `npm run dev:api` creates `dist/`; if you call `wrangler dev` directly, run `npm run build` first |
-| `no such table` | `npm run db:migrate:local` |
-| API calls 502 in Vite | `npm run dev:api` is not running, or is on another port (set `POS_API`) |
-| Meter scan unavailable locally | Expected: `npm run dev:api` leaves out the Workers AI binding. For real scans, `npm run cf:login`, then `npm run dev:api -- --ai` |
-| `wrangler.dev.jsonc` appeared | Generated by `npm run dev:api`; git-ignored and safe to delete |
-| `wrangler dev` asks you to log in | You started it directly with the AI binding present. Use `npm run dev:api`, or `npx wrangler dev -c wrangler.dev.jsonc` after it has been generated |
-| Signed out after each restart | Expected if you deleted `.wrangler/state/` (sessions live in D1) |
+| Vite API requests fail | Start `npm run dev:api` and confirm the proxy port. |
+| Missing tables | Run `npm run db:migrate:local`. |
+| AI scanning unavailable | Expected without AI binding; use `--ai` after logging in if you intend to use cloud AI. |
+| Signed out after deleting local state | Sessions are in local D1 and are removed with `.wrangler/state/`. |
+| Wrangler asks for login | Use the `dev:api` script, which omits AI by default. |
